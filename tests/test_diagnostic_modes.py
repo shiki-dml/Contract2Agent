@@ -172,7 +172,11 @@ def test_deep_mode_respects_review_policies() -> None:
         interactive=False,
     )
 
-    assert not never_report.review_required
+    assert never_report.review_required
+    assert any(
+        finding.requires_human_review
+        for finding in never_report.findings
+    )
     assert on_fail_report.review_required
     assert each_round_report.review_required
 

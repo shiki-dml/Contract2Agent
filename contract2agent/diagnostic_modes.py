@@ -12,6 +12,26 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from contract2agent.checker import check_trace
+from contract2agent.failure_taxonomy import (
+    BaselineFailureComparison,
+    FailureClassifier,
+    FailureType,
+    Finding as TaxonomyFinding,
+    FindingAggregator,
+    FixStrategyRouter,
+    GroupedFinding,
+    Severity,
+    TimeCostSummary,
+    auto_stop_reason,
+    build_patch_proposal_from_strategy,
+    build_validation_plan,
+    compare_failure_taxonomy,
+    failure_type_counts,
+    failure_type_severity_counts,
+    render_failure_taxonomy_markdown,
+    select_next_round_tags,
+    summarize_time_cost_by_failure_type,
+)
 from contract2agent.parser import parse_requirement
 from contract2agent.schema import AgentContract
 
@@ -116,6 +136,8 @@ class RuleScore:
     score: float
     severity: str
     message: str
+    value: Any = None
+    confidence: float | None = None
 
 
 @dataclass
@@ -138,17 +160,10 @@ class TestResult:
     check_rule: str | None
     check_message: str
     rule_scores: list[RuleScore] = field(default_factory=list)
-
-
-@dataclass
-class Finding:
-    id: str
-    severity: str
-    status: str
-    title: str
-    description: str
-    related_test_id: str | None = None
-    related_trace_id: str | None = None
+    duration_seconds: float = 0.0
+    scorer_confidence: float | None = None
+    passed_runs: int | None = None
+    total_runs: int | None = None
 
 
 @dataclass
@@ -161,6 +176,75 @@ class ReviewItem:
     related_trace_id: str | None = None
     suggested_action: str = ""
     requires_user_decision: bool = False
+
+
+class Finding(TaxonomyFinding):
+    def __init__(
+        self,
+        id: str,
+        severity: str | Severity = Severity.INFO,
+        status: str = "FAIL",
+        title: str = "",
+        description: str = "",
+        related_test_id: str | None = None,
+        related_trace_id: str | None = None,
+        suggested_action: str = "",
+        requires_human_review: bool | None = None,
+        *,
+        test_id: str | None = None,
+        round_id: str = "",
+        mode: str = "",
+        failure_type: FailureType | str = FailureType.UNKNOWN,
+        evidence: list[str] | None = None,
+        expected_behavior: str = "",
+        actual_behavior: str = "",
+        related_tool_calls: list[dict[str, Any]] | None = None,
+        likely_cause: str = "",
+        suggested_fix: str | None = None,
+        suggested_fix_type: str = "none",
+        patch_target_candidates: list[str] | None = None,
+        auto_fix_eligible: bool = False,
+        confidence: str = "medium",
+        next_round_tags: list[str] | None = None,
+        regression_status: str = "unknown",
+        source: str = "diagnostic_modes",
+        secondary_failure_types: list[FailureType] | None = None,
+        test_tags: list[str] | None = None,
+        rollback_candidate: bool = False,
+    ) -> None:
+        severity_value = severity.value if isinstance(severity, Severity) else str(severity)
+        if requires_human_review is None:
+            requires_human_review = status != "PASS" and severity_value != Severity.INFO.value
+        super().__init__(
+            id=id,
+            test_id=test_id or related_test_id,
+            round_id=round_id,
+            mode=mode,
+            failure_type=failure_type,
+            severity=severity,
+            title=title,
+            description=description,
+            evidence=evidence or [],
+            expected_behavior=expected_behavior,
+            actual_behavior=actual_behavior,
+            related_trace_id=related_trace_id,
+            related_tool_calls=related_tool_calls or [],
+            likely_cause=likely_cause,
+            suggested_fix=suggested_fix if suggested_fix is not None else suggested_action,
+            suggested_fix_type=suggested_fix_type,
+            patch_target_candidates=patch_target_candidates or [],
+            auto_fix_eligible=auto_fix_eligible,
+            requires_human_review=requires_human_review,
+            confidence=confidence,
+            next_round_tags=next_round_tags or [],
+            regression_status=regression_status,
+            source=source,
+            secondary_failure_types=secondary_failure_types or [],
+            status=status,
+            related_test_id=related_test_id,
+            test_tags=test_tags or [],
+            rollback_candidate=rollback_candidate,
+        )
 
 
 @dataclass
@@ -176,6 +260,11 @@ class DiagnosticRound:
     started_at: str
     finished_at: str
     test_results: list[TestResult] = field(default_factory=list)
+    taxonomy_summary: list[GroupedFinding] = field(default_factory=list)
+    next_round_focus_tags: list[str] = field(default_factory=list)
+    failure_type_counts: dict[str, int] = field(default_factory=dict)
+    review_required: bool = False
+    time_cost_summary: TimeCostSummary | None = None
 
 
 @dataclass
@@ -185,6 +274,19 @@ class PatchProposal:
     patch_summary: str
     reason_for_patch: str
     high_risk: bool = False
+    patch_id: str | None = None
+    created_at: str | None = None
+    reason: str | None = None
+    related_finding_ids: list[str] = field(default_factory=list)
+    failure_types: list[FailureType] = field(default_factory=list)
+    risk_level: str = "low"
+    requires_approval: bool = False
+    files_changed: list[str] = field(default_factory=list)
+    diff: str = ""
+    expected_effect: list[str] = field(default_factory=list)
+    validation_tags: list[str] = field(default_factory=list)
+    rollback_available: bool = False
+    do_not_apply_automatically: bool = False
 
 
 @dataclass
@@ -234,6 +336,19 @@ class DiagnosticReport:
     budget_summary: dict[str, Any] = field(default_factory=dict)
     recommendations: list[str] = field(default_factory=list)
     rounds: list[DiagnosticRound] = field(default_factory=list)
+    taxonomy_summary: list[GroupedFinding] = field(default_factory=list)
+    failure_type_counts: dict[str, int] = field(default_factory=dict)
+    failure_type_severity_counts: dict[str, dict[str, int]] = field(default_factory=dict)
+    review_required_findings: list[str] = field(default_factory=list)
+    auto_fix_eligible_findings: list[str] = field(default_factory=list)
+    patch_target_candidates: list[str] = field(default_factory=list)
+    recommended_next_round_tags: list[str] = field(default_factory=list)
+    baseline_comparison: BaselineFailureComparison | None = None
+    time_cost_summary: TimeCostSummary | None = None
+    persistent_failure_types: list[str] = field(default_factory=list)
+    new_failure_types: list[str] = field(default_factory=list)
+    resolved_failure_types: list[str] = field(default_factory=list)
+    critical_regressions: list[str] = field(default_factory=list)
 
 
 class DiagnosticAgent(Protocol):
@@ -347,17 +462,33 @@ class SafePatcher:
         self.repo_root = Path(repo_root).resolve()
 
     def create_patch_proposal(self, round_report: DiagnosticRound) -> PatchProposal | None:
-        target = self._find_patch_target()
+        strategies = FixStrategyRouter().route(round_report.taxonomy_summary or round_report.findings)
+        if not strategies:
+            return None
+        strategy = strategies[0]
+        if not strategy.auto_fix_allowed and strategy.failure_types[0] in {
+            FailureType.SCORER_UNCERTAIN,
+            FailureType.UNKNOWN,
+        }:
+            return None
+
+        target = self._find_patch_target(strategy.patch_targets)
         if target is None:
             return None
 
-        reason = _patch_reason_for_round(round_report)
+        preview = build_patch_proposal_from_strategy(
+            strategy,
+            files_changed=[str(target)],
+        )
+        reason = preview.reason
         if target.suffix.lower() == ".md":
             current = target.read_text(encoding="utf-8") if target.exists() else ""
             addition = (
                 "\n\n## AgentDoctor Repair Guidance\n\n"
                 f"- {reason}\n"
-                "- Preserve required tool ordering, output sections, and safe refusal behavior.\n"
+                f"- Failure types: {', '.join(item.value for item in preview.failure_types)}\n"
+                f"- Validation tags: {', '.join(preview.validation_tags)}\n"
+                f"- {strategy.suggested_patch_template}\n"
             )
             new_text = current.rstrip() + addition
         else:
@@ -369,6 +500,20 @@ class SafePatcher:
             new_text=new_text,
             patch_summary="Add AgentDoctor repair guidance to a safe prompt/config file.",
             reason_for_patch=reason,
+            high_risk=strategy.risk_level == "high" or not strategy.auto_fix_allowed,
+            patch_id=preview.patch_id,
+            created_at=preview.created_at,
+            reason=preview.reason,
+            related_finding_ids=preview.related_finding_ids,
+            failure_types=preview.failure_types,
+            risk_level=preview.risk_level,
+            requires_approval=preview.requires_approval,
+            files_changed=preview.files_changed,
+            diff=preview.diff,
+            expected_effect=preview.expected_effect,
+            validation_tags=preview.validation_tags,
+            rollback_available=preview.rollback_available,
+            do_not_apply_automatically=preview.do_not_apply_automatically,
         )
 
     def apply(
@@ -386,6 +531,8 @@ class SafePatcher:
         file_existed = path.exists()
         previous_text = path.read_text(encoding="utf-8") if file_existed else ""
         diff = _unified_diff(previous_text, proposal.new_text, path)
+        proposal.diff = diff
+        proposal.files_changed = [str(path)]
         path.write_text(proposal.new_text, encoding="utf-8")
         return PatchHistory(
             round_index=round_index,
@@ -409,7 +556,20 @@ class SafePatcher:
             path.unlink()
         patch.rollback_performed = True
 
-    def _find_patch_target(self) -> Path | None:
+    def _find_patch_target(self, candidates: list[str] | None = None) -> Path | None:
+        candidate_paths: list[Path] = []
+        for candidate in candidates or []:
+            if candidate in {"none", "scorer config", "baseline snapshot", "previous_patch"}:
+                continue
+            path = self.repo_root / candidate
+            if is_safe_patch_target(path, self.repo_root):
+                candidate_paths.append(path)
+        existing_candidates = [path for path in candidate_paths if path.exists()]
+        if existing_candidates:
+            return sorted(existing_candidates, key=lambda item: str(item.relative_to(self.repo_root)))[0]
+        if candidate_paths:
+            return sorted(candidate_paths, key=lambda item: str(item.relative_to(self.repo_root)))[0]
+
         existing: list[Path] = []
         for path in self.repo_root.rglob("*"):
             if path.is_file() and is_safe_patch_target(path, self.repo_root):
@@ -603,9 +763,11 @@ def plan_test_cases(
     mode: DiagnosticMode | str,
     round_index: int,
     cases: list[TestCase] | None = None,
+    focus_tags: list[str] | None = None,
 ) -> list[TestCase]:
     normalized_mode = DiagnosticMode(mode)
     cases = cases or default_test_cases()
+    focus = set(focus_tags or [])
     if normalized_mode == DiagnosticMode.QUICK:
         preferred = {"task_completion", "tool_use", "output_format", "error_handling"}
         selected = [
@@ -621,6 +783,15 @@ def plan_test_cases(
         selected = [case for case in cases if case.priority >= 70]
     else:
         selected = list(cases)
+    if focus:
+        return sorted(
+            selected,
+            key=lambda case: (
+                0 if focus.intersection(case.tags) else 1,
+                -case.priority,
+                case.id,
+            ),
+        )
     return sorted(selected, key=lambda case: (-case.priority, case.id))
 
 
@@ -663,7 +834,7 @@ def run_quick_diagnosis(
         review_required=review_required,
         review_items=review_items,
         recommendations=[
-            "Run `agentdoctor deep --rounds 3 --review on-fail` before trusting this agent in production.",
+            _recommended_deep_command(round_report.next_round_focus_tags),
             "Treat quick mode findings as smoke-diagnosis signals, not certification.",
         ],
     )
@@ -679,6 +850,7 @@ def run_deep_diagnosis(
     agent: DiagnosticAgent | None = None,
     out_dir: str | Path = "reports",
     interactive: bool | None = None,
+    focus_tags: list[str] | None = None,
 ) -> DiagnosticReport:
     if rounds < 1:
         raise ValueError("--rounds must be at least 1")
@@ -690,6 +862,7 @@ def run_deep_diagnosis(
     round_reports: list[DiagnosticRound] = []
     review_items: list[ReviewItem] = []
     review_required = False
+    focus_tags = list(focus_tags or [])
 
     for index in range(1, rounds + 1):
         round_report = run_diagnostic_round(
@@ -697,9 +870,15 @@ def run_deep_diagnosis(
             mode=DiagnosticMode.DEEP,
             contract=contract,
             agent=agent,
-            test_cases=plan_test_cases(DiagnosticMode.DEEP, index, all_cases),
+            test_cases=plan_test_cases(
+                DiagnosticMode.DEEP,
+                index,
+                all_cases,
+                focus_tags=focus_tags,
+            ),
         )
         round_reports.append(round_report)
+        focus_tags = round_report.next_round_focus_tags
         round_needs_review = round_requires_review(round_report, policy)
         if round_needs_review:
             review_required = True
@@ -785,6 +964,22 @@ def run_auto_diagnosis(
             if interactive and not _prompt_continue(index):
                 status = "needs_review"
                 break
+
+        stop_reason = auto_stop_reason(round_report.taxonomy_summary)
+        if stop_reason:
+            review_required = True
+            review_items.append(
+                ReviewItem(
+                    id=f"R-auto-taxonomy-stop-{index}",
+                    severity="critical" if "SAFETY_RISK" in stop_reason or "FORBIDDEN_TOOL_CALL" in stop_reason else "warning",
+                    title="Failure type requires review",
+                    description=stop_reason,
+                    suggested_action="Review the failure taxonomy summary before applying patches.",
+                    requires_user_decision=True,
+                )
+            )
+            status = "needs_review"
+            break
 
         if round_report.confidence >= target_confidence:
             status = "passed_with_review_recommended" if review_required else "passed"
@@ -960,9 +1155,11 @@ def run_diagnostic_round(
     results: list[TestResult] = []
     findings: list[Finding] = []
     review_items: list[ReviewItem] = []
+    classifier = FailureClassifier()
 
     for index, test_case in enumerate(test_cases, start=1):
         trace_id = f"trace-{round_index:03d}-{index:03d}"
+        test_started = time.monotonic()
         events = agent.run_test(test_case)
         trace = TraceRecord(
             id=trace_id,
@@ -974,13 +1171,42 @@ def run_diagnostic_round(
         )
         traces.append(trace)
         result = evaluate_test_case(contract, test_case, trace)
+        result.duration_seconds = round(time.monotonic() - test_started, 4)
         results.append(result)
-        findings.extend(_findings_for_test(test_case, trace, result))
+        test_findings = _findings_for_test(
+            test_case,
+            trace,
+            result,
+            round_id=f"round_{round_index}",
+            mode=mode.value,
+            classifier=classifier,
+        )
+        findings.extend(test_findings)
         review_items.extend(_review_items_for_test(test_case, trace, result))
+        for finding in test_findings:
+            if finding.requires_human_review and not any(
+                item.id == f"R-{test_case.id}-{finding.failure_type.value.lower()}"
+                for item in review_items
+            ):
+                review_items.append(
+                    ReviewItem(
+                        id=f"R-{test_case.id}-{finding.failure_type.value.lower()}",
+                        severity=finding.severity.value,
+                        title=f"{finding.failure_type.value} requires review",
+                        description=finding.description,
+                        related_test_id=test_case.id,
+                        related_trace_id=trace.id,
+                        suggested_action=finding.suggested_fix,
+                        requires_user_decision=True,
+                    )
+                )
 
     scores = compute_component_scores(test_cases, results)
     confidence = compute_diagnostic_confidence(scores)
     finished_at = _now_iso()
+    taxonomy_summary = FindingAggregator().aggregate(findings)
+    durations = {result.test_case_id: result.duration_seconds for result in results}
+    time_cost_summary = summarize_time_cost_by_failure_type(findings, durations)
     return DiagnosticRound(
         round_index=round_index,
         mode=mode.value,
@@ -993,6 +1219,11 @@ def run_diagnostic_round(
         started_at=started_at,
         finished_at=finished_at,
         test_results=results,
+        taxonomy_summary=taxonomy_summary,
+        next_round_focus_tags=select_next_round_tags(taxonomy_summary),
+        failure_type_counts=failure_type_counts(findings),
+        review_required=any(finding.requires_human_review for finding in findings),
+        time_cost_summary=time_cost_summary,
     )
 
 
@@ -1072,6 +1303,7 @@ def score_rule(rule: ScoringRule, trace: TraceRecord) -> RuleScore:
         score=1.0 if passed else 0.0,
         severity=rule.severity,
         message=message,
+        value=rule.value,
     )
 
 
@@ -1142,6 +1374,8 @@ def round_requires_review(
         result.warning_count for result in round_report.test_results
     ) or any(trace.suspicious_tool_behavior for trace in round_report.traces) or any(
         item.severity in {"warning", "error", "critical"} for item in round_report.review_items
+    ) or any(
+        finding.requires_human_review for finding in round_report.findings
     )
 
 
@@ -1169,6 +1403,16 @@ def auto_mode_warnings(target_confidence: float) -> list[str]:
             "Strong warning: The requested target confidence is very high. This may lead to overfitting, excessive runtime, and fragile prompt/config changes. Recommended range: 0.80 to 0.90."
         )
     return warnings
+
+
+def _recommended_deep_command(focus_tags: list[str]) -> str:
+    focus = ",".join(focus_tags)
+    if focus:
+        return (
+            "`agentdoctor deep --rounds 3 --review on-fail --focus "
+            f"{focus}` is the recommended next diagnostic round."
+        )
+    return "Run `agentdoctor deep --rounds 3 --review on-fail` before trusting this agent in production."
 
 
 def is_safe_patch_target(path: str | Path, repo_root: str | Path) -> bool:
@@ -1252,7 +1496,9 @@ def format_console_report(report: DiagnosticReport) -> str:
     if report.findings:
         lines.extend(["", "Key findings:"])
         for index, finding in enumerate(report.findings[:5], start=1):
-            lines.append(f"{index}. {finding.status}: {finding.description}")
+            lines.append(
+                f"{index}. {finding.status} {finding.failure_type.value}: {finding.description}"
+            )
     if report.recommendations:
         lines.extend(["", "Recommendation:"])
         lines.append(report.recommendations[0])
@@ -1292,9 +1538,47 @@ def format_markdown_report(report: DiagnosticReport) -> str:
     )
     if report.findings:
         for index, finding in enumerate(report.findings, start=1):
-            lines.append(f"{index}. {finding.status}: {finding.description}")
+            lines.append(
+                f"{index}. {finding.status} {finding.failure_type.value}: {finding.description}"
+            )
     else:
         lines.append("No findings were generated.")
+
+    lines.extend(["", render_failure_taxonomy_markdown(report.taxonomy_summary), ""])
+
+    lines.extend(["## Failure Type Changes", ""])
+    lines.append(
+        "Persistent failure types: "
+        + (", ".join(report.persistent_failure_types) if report.persistent_failure_types else "none")
+    )
+    lines.append(
+        "New failure types: "
+        + (", ".join(report.new_failure_types) if report.new_failure_types else "none")
+    )
+    lines.append(
+        "Resolved failure types: "
+        + (", ".join(report.resolved_failure_types) if report.resolved_failure_types else "none")
+    )
+    if report.critical_regressions:
+        lines.append("Critical regressions: " + ", ".join(report.critical_regressions))
+    lines.extend(["", "Review-required findings:"])
+    if report.review_required_findings:
+        for finding_id in report.review_required_findings:
+            lines.append(f"- {finding_id}")
+    else:
+        lines.append("- none")
+    lines.extend(["", "Auto-fix eligible findings:"])
+    if report.auto_fix_eligible_findings:
+        for finding_id in report.auto_fix_eligible_findings:
+            lines.append(f"- {finding_id}")
+    else:
+        lines.append("- none")
+    lines.extend(["", "Recommended next round focus:"])
+    if report.recommended_next_round_tags:
+        for tag in report.recommended_next_round_tags:
+            lines.append(f"- {tag}")
+    else:
+        lines.append("- none")
 
     lines.extend(["", "## Review Items", ""])
     if report.review_items:
@@ -1357,6 +1641,33 @@ def _build_report(
     fail_count = sum(1 for result in all_results if not result.passed)
     warning_count = sum(result.warning_count for result in all_results)
     overall_confidence = rounds[-1].confidence if rounds else 0.0
+    taxonomy_summary = FindingAggregator().aggregate(findings)
+    durations: dict[str, float] = {}
+    for result in all_results:
+        durations[result.test_case_id] = durations.get(result.test_case_id, 0.0) + result.duration_seconds
+    time_cost_summary = summarize_time_cost_by_failure_type(findings, durations)
+    baseline_comparison = None
+    persistent_failure_types: list[str] = []
+    new_failure_types: list[str] = []
+    resolved_failure_types: list[str] = []
+    critical_regressions: list[str] = []
+    if len(rounds) >= 2:
+        baseline_comparison = compare_failure_taxonomy(
+            rounds[0].findings,
+            rounds[-1].findings,
+            baseline_confidence=rounds[0].confidence,
+            current_confidence=rounds[-1].confidence,
+        )
+        persistent_failure_types = list(baseline_comparison.unchanged_failure_types)
+        new_failure_types = list(baseline_comparison.new_failure_types)
+        resolved_failure_types = list(baseline_comparison.resolved_failure_types)
+        critical_regressions = list(baseline_comparison.critical_regressions)
+    review_required = review_required or any(finding.requires_human_review for finding in findings)
+    if review_required and status == "passed":
+        status = "passed_with_review_recommended"
+    elif review_required and status == "failed":
+        status = "needs_review"
+    recommended_next_round_tags = select_next_round_tags(taxonomy_summary)
     return DiagnosticReport(
         mode=mode.value,
         status=status,
@@ -1376,6 +1687,25 @@ def _build_report(
         budget_summary=budget_summary or {},
         recommendations=recommendations,
         rounds=rounds,
+        taxonomy_summary=taxonomy_summary,
+        failure_type_counts=failure_type_counts(findings),
+        failure_type_severity_counts=failure_type_severity_counts(findings),
+        review_required_findings=[
+            finding.id for finding in findings if finding.requires_human_review
+        ],
+        auto_fix_eligible_findings=[
+            finding.id for finding in findings if finding.auto_fix_eligible
+        ],
+        patch_target_candidates=_dedupe_strings(
+            target for finding in findings for target in finding.patch_target_candidates
+        ),
+        recommended_next_round_tags=recommended_next_round_tags,
+        baseline_comparison=baseline_comparison,
+        time_cost_summary=time_cost_summary,
+        persistent_failure_types=persistent_failure_types,
+        new_failure_types=new_failure_types,
+        resolved_failure_types=resolved_failure_types,
+        critical_regressions=critical_regressions,
     )
 
 
@@ -1390,59 +1720,21 @@ def _findings_for_test(
     test_case: TestCase,
     trace: TraceRecord,
     result: TestResult,
+    *,
+    round_id: str,
+    mode: str,
+    classifier: FailureClassifier | None = None,
 ) -> list[Finding]:
-    findings: list[Finding] = []
-    if result.passed and result.warning_count == 0:
-        findings.append(
-            Finding(
-                id=f"F-{test_case.id}-pass",
-                severity="info",
-                status="PASS",
-                title=test_case.name,
-                description=_pass_description(test_case),
-                related_test_id=test_case.id,
-                related_trace_id=trace.id,
-            )
-        )
-    if not result.passed:
-        message = result.check_message or _first_failed_rule_message(result)
-        findings.append(
-            Finding(
-                id=f"F-{test_case.id}-fail",
-                severity="error",
-                status="FAIL",
-                title=test_case.name,
-                description=message or f"{test_case.name} failed.",
-                related_test_id=test_case.id,
-                related_trace_id=trace.id,
-            )
-        )
-    for rule_score in result.rule_scores:
-        if not rule_score.passed and rule_score.severity == "warning":
-            findings.append(
-                Finding(
-                    id=f"F-{test_case.id}-warn-{rule_score.kind}",
-                    severity="warning",
-                    status="WARN",
-                    title=test_case.name,
-                    description=rule_score.message,
-                    related_test_id=test_case.id,
-                    related_trace_id=trace.id,
-                )
-            )
-    if test_case.review_hint:
-        findings.append(
-            Finding(
-                id=f"F-{test_case.id}-review",
-                severity="warning",
-                status="REVIEW",
-                title=test_case.name,
-                description=test_case.review_hint,
-                related_test_id=test_case.id,
-                related_trace_id=trace.id,
-            )
-        )
-    return findings
+    classifier = classifier or FailureClassifier()
+    finding = classifier.classify(
+        test_case=test_case,
+        test_result=result,
+        trace=trace,
+        round_id=round_id,
+        mode=mode,
+        source="scorer",
+    )
+    return [finding] if finding is not None else []
 
 
 def _review_items_for_test(
@@ -1605,6 +1897,23 @@ def _overfitting_warning(
     *,
     enough_tests: bool,
 ) -> str | None:
+    if len(rounds) >= 2:
+        comparison = compare_failure_taxonomy(rounds[0].findings, rounds[-1].findings)
+        if comparison.critical_regressions:
+            return (
+                "High risk. The latest rounds introduced critical failure types: "
+                f"{', '.join(comparison.critical_regressions)}."
+            )
+        introduced = [
+            failure_type
+            for failure_type in comparison.new_failure_types
+            if failure_type not in {FailureType.SCORER_UNCERTAIN.value, FailureType.UNKNOWN.value}
+        ]
+        if introduced:
+            return (
+                "Medium risk. The repair path introduced new unrelated failure types: "
+                f"{', '.join(introduced)}."
+            )
     if not enough_tests or holdout_confidence is None:
         return (
             "Medium risk. There are not enough tests for a robust diagnostic, "
@@ -1630,6 +1939,19 @@ def _efficiency_warning(
     max_time_minutes: int,
     min_improvement: float,
 ) -> str | None:
+    all_findings = [finding for round_report in rounds for finding in round_report.findings]
+    all_durations: dict[str, float] = {}
+    for round_report in rounds:
+        for result in round_report.test_results:
+            all_durations[result.test_case_id] = (
+                all_durations.get(result.test_case_id, 0.0) + result.duration_seconds
+            )
+    cost_summary = summarize_time_cost_by_failure_type(all_findings, all_durations)
+    if FailureType.LOOP_RISK.value in cost_summary.inefficient_failure_types:
+        return (
+            "LOOP_RISK is associated with slow or repeated diagnostic work. "
+            "Stop auto mode if confidence is not improving."
+        )
     if len(rounds) >= 3:
         improvements = [
             rounds[index].confidence - rounds[index - 1].confidence
@@ -1651,6 +1973,12 @@ def _efficiency_warning(
 
 
 def _patch_reason_for_round(round_report: DiagnosticRound) -> str:
+    if round_report.taxonomy_summary:
+        group = round_report.taxonomy_summary[0]
+        return (
+            f"{group.failure_type.value}: {group.suggested_fix} "
+            f"Affected tests: {', '.join(group.affected_tests)}."
+        )
     for finding in round_report.findings:
         if finding.status == "FAIL":
             return finding.description
@@ -1707,6 +2035,18 @@ def _prompt_continue(round_index: int) -> bool:
 
 def _elapsed_minutes(started: float) -> float:
     return (time.monotonic() - started) / 60
+
+
+def _dedupe_strings(items: Any) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        text = str(item)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
 
 
 def _now_iso() -> str:

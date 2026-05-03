@@ -2,9 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
+from contract2agent.baseline import (
+    compare_against_baseline,
+    format_baseline_saved_summary,
+    format_comparison_summary,
+    save_baseline,
+)
 from contract2agent.checker import CheckResult, check_trace, check_trace_file
 from contract2agent.compiler import (
     compile_contract,
@@ -34,9 +41,18 @@ from contract2agent.capabilities import (
     write_capability_eval_cases,
     write_capability_report,
 )
+from contract2agent.cost_estimate import CostEstimateOptions, run_cost_estimate
 from contract2agent.schema import load_contract, model_to_dict
 from contract2agent.triage import TriageOptions, run_triage
-from contract2agent.triage.report import format_json_report, format_terminal_summary
+from contract2agent.triage.report import (
+    format_json_report as format_triage_json_report,
+    format_terminal_summary as format_triage_terminal_summary,
+)
+from contract2agent.patch_preview import PatchPreviewOptions, run_patch_preview
+from contract2agent.patch_preview.report import (
+    format_json_report as format_patch_preview_json_report,
+    format_terminal_summary as format_patch_preview_terminal_summary,
+)
 
 try:
     import yaml
@@ -174,6 +190,7 @@ def _cmd_triage(
     output_format: str = "markdown",
     output: Path | None = None,
     allow_auto: bool = False,
+    include_cost: bool = False,
 ) -> int:
     plan = run_triage(
         TriageOptions(
@@ -186,11 +203,99 @@ def _cmd_triage(
     )
     normalized = output_format.casefold()
     if normalized == "json":
-        console.print(format_json_report(plan).rstrip())
+        console.print(format_triage_json_report(plan).rstrip())
     elif normalized == "markdown":
-        console.print(format_terminal_summary(plan))
+        console.print(format_triage_terminal_summary(plan))
     else:
         raise ValueError("--format must be markdown or json")
+    if include_cost:
+        latest_triage_json = Path(
+            plan.report_paths.get("latest_json", ".agentdoctor/triage/latest.json")
+        )
+        estimate, summary = run_cost_estimate(
+            CostEstimateOptions(
+                from_triage=latest_triage_json,
+                output_format="markdown",
+            ),
+            cwd=Path(plan.project_root),
+        )
+        console.print("")
+        console.print(summary.rstrip())
+        console.print(
+            f"Wrote cost estimate to {estimate.report_paths.get('latest_markdown', '.agentdoctor/cost/latest.md')}"
+        )
+    return 0
+
+
+def _cmd_patch_preview(
+    from_run: Path | None = None,
+    from_findings: Path | None = None,
+    failure_type: str | None = None,
+    output: Path | None = None,
+    output_format: str = "markdown",
+    dry_run: bool = True,
+    allow_apply: bool = False,
+    apply_patch_id: str | None = None,
+    project_root: Path = Path("."),
+) -> int:
+    report = run_patch_preview(
+        PatchPreviewOptions(
+            project_root=project_root,
+            from_run=from_run,
+            from_findings=from_findings,
+            failure_type=failure_type,
+            output=output,
+            output_format=output_format,
+            dry_run=dry_run,
+            allow_apply=allow_apply,
+            apply_patch_id=apply_patch_id,
+        )
+    )
+    normalized = output_format.casefold()
+    if normalized == "json":
+        console.print(format_patch_preview_json_report(report).rstrip())
+    elif normalized == "markdown":
+        console.print(format_patch_preview_terminal_summary(report))
+    else:
+        raise ValueError("--format must be markdown or json")
+    return 0
+
+
+def _cmd_cost_estimate(
+    from_triage: Path | None = None,
+    mode: str | None = None,
+    budget: str = "balanced",
+    max_rounds: int | None = None,
+    max_tests: int | None = None,
+    max_runtime_minutes: int | None = None,
+    max_llm_calls: int | None = None,
+    max_tool_calls: int | None = None,
+    max_tool_calls_per_test: int | None = None,
+    max_repeated_runs: int | None = None,
+    max_auto_iterations: int | None = None,
+    max_patch_attempts: int | None = None,
+    output: Path | None = None,
+    output_format: str = "markdown",
+) -> int:
+    _, rendered = run_cost_estimate(
+        CostEstimateOptions(
+            from_triage=from_triage,
+            mode=mode,
+            budget_profile=budget,
+            max_rounds=max_rounds,
+            max_tests=max_tests,
+            max_runtime_minutes=max_runtime_minutes,
+            max_llm_calls=max_llm_calls,
+            max_tool_calls=max_tool_calls,
+            max_tool_calls_per_test=max_tool_calls_per_test,
+            max_repeated_runs=max_repeated_runs,
+            max_auto_iterations=max_auto_iterations,
+            max_patch_attempts=max_patch_attempts,
+            output=output,
+            output_format=output_format,
+        )
+    )
+    console.print(rendered.rstrip())
     return 0
 
 
@@ -203,11 +308,97 @@ def _mode_contract(contract: Path | None = None) -> Any:
     return default_contract()
 
 
-def _cmd_quick(contract: Path | None = None, out: Path = Path("reports")) -> int:
+def _command_string() -> str:
+    command = Path(sys.argv[0]).name
+    if command in {"cli.py", "__main__.py"}:
+        command = "agentdoctor"
+    return " ".join([command, *sys.argv[1:]])
+
+
+def _normalize_optional_compare_baseline_args(argv: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for index, item in enumerate(argv):
+        normalized.append(item)
+        if item != "--compare-baseline":
+            continue
+        next_item = argv[index + 1] if index + 1 < len(argv) else None
+        if next_item is None or next_item.startswith("-"):
+            normalized.append("latest")
+    return normalized
+
+
+def main() -> None:
+    sys.argv[:] = _normalize_optional_compare_baseline_args(sys.argv)
+    app()
+
+
+def _parse_focus_tags(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _handle_baseline_actions(
+    *,
+    report: Any,
+    out: Path,
+    project_root: Path = Path("."),
+    agent: Path | None = None,
+    save_baseline_flag: bool = False,
+    baseline_name: str | None = None,
+    compare_baseline_ref: str | None = None,
+) -> int:
+    if save_baseline_flag:
+        saved = save_baseline(
+            report=report,
+            project_root=project_root,
+            baseline_name=baseline_name,
+            command=_command_string(),
+            agent_config_path=agent,
+            report_dir=out,
+        )
+        console.print("")
+        console.print(format_baseline_saved_summary(saved))
+
+    if compare_baseline_ref is not None:
+        compared = compare_against_baseline(
+            report=report,
+            project_root=project_root,
+            baseline_ref=compare_baseline_ref or "latest",
+            command=_command_string(),
+            agent_config_path=agent,
+        )
+        console.print("")
+        if compared.comparison is None:
+            console.print("Baseline Comparison")
+            for warning in compared.warnings:
+                console.print(f"Warning: {warning}")
+            return 1
+        console.print(format_comparison_summary(compared.comparison))
+        if compared.markdown_path is not None:
+            console.print(f"Wrote baseline comparison to {compared.markdown_path}")
+    return 0
+
+
+def _cmd_quick(
+    contract: Path | None = None,
+    out: Path = Path("reports"),
+    agent: Path | None = None,
+    save_baseline_flag: bool = False,
+    baseline_name: str | None = None,
+    compare_baseline_ref: str | None = None,
+) -> int:
     report = run_quick_diagnosis(contract=_mode_contract(contract), out_dir=out)
     console.print(format_console_report(report))
     console.print(f"Wrote diagnostic report to {out / 'latest.md'}")
-    return 0
+    return _handle_baseline_actions(
+        report=report,
+        out=out,
+        agent=agent,
+        save_baseline_flag=save_baseline_flag,
+        baseline_name=baseline_name,
+        compare_baseline_ref=compare_baseline_ref,
+    )
 
 
 def _cmd_deep(
@@ -215,16 +406,29 @@ def _cmd_deep(
     review: str = ReviewPolicy.ON_FAIL.value,
     contract: Path | None = None,
     out: Path = Path("reports"),
+    agent: Path | None = None,
+    save_baseline_flag: bool = False,
+    baseline_name: str | None = None,
+    compare_baseline_ref: str | None = None,
+    focus: str | None = None,
 ) -> int:
     report = run_deep_diagnosis(
         rounds=rounds,
         review_policy=review,
         contract=_mode_contract(contract),
         out_dir=out,
+        focus_tags=_parse_focus_tags(focus),
     )
     console.print(format_console_report(report))
     console.print(f"Wrote diagnostic report to {out / 'latest.md'}")
-    return 0
+    return _handle_baseline_actions(
+        report=report,
+        out=out,
+        agent=agent,
+        save_baseline_flag=save_baseline_flag,
+        baseline_name=baseline_name,
+        compare_baseline_ref=compare_baseline_ref,
+    )
 
 
 def _cmd_auto(
@@ -237,6 +441,10 @@ def _cmd_auto(
     contract: Path | None = None,
     out: Path = Path("reports"),
     repo_root: Path = Path("."),
+    agent: Path | None = None,
+    save_baseline_flag: bool = False,
+    baseline_name: str | None = None,
+    compare_baseline_ref: str | None = None,
 ) -> int:
     for warning in auto_mode_warnings(target_confidence):
         console.print(warning)
@@ -253,7 +461,15 @@ def _cmd_auto(
     )
     console.print(format_console_report(report))
     console.print(f"Wrote diagnostic report to {out / 'latest.md'}")
-    return 0
+    return _handle_baseline_actions(
+        report=report,
+        out=out,
+        project_root=repo_root,
+        agent=agent,
+        save_baseline_flag=save_baseline_flag,
+        baseline_name=baseline_name,
+        compare_baseline_ref=compare_baseline_ref,
+    )
 
 
 def _cmd_check_all(
@@ -653,8 +869,37 @@ if _HAS_TYPER:
             "-o",
             help="Report output directory.",
         ),
+        agent: Path | None = typer.Option(
+            None,
+            "--agent",
+            help="Optional agent config path used for baseline snapshots.",
+        ),
+        save_baseline_flag: bool = typer.Option(
+            False,
+            "--save-baseline",
+            help="Save this diagnostic run as an AgentDoctor baseline.",
+        ),
+        baseline_name: str | None = typer.Option(
+            None,
+            "--baseline-name",
+            help="Optional human-readable name for a saved baseline.",
+        ),
+        compare_baseline_ref: str | None = typer.Option(
+            None,
+            "--compare-baseline",
+            help="Compare this run with a saved baseline. Use latest or a baseline name.",
+        ),
     ) -> None:
-        raise typer.Exit(_cmd_quick(contract, out))
+        raise typer.Exit(
+            _cmd_quick(
+                contract,
+                out,
+                agent,
+                save_baseline_flag,
+                baseline_name,
+                compare_baseline_ref,
+            )
+        )
 
     @app.command()
     def deep(
@@ -675,8 +920,45 @@ if _HAS_TYPER:
             "-o",
             help="Report output directory.",
         ),
+        agent: Path | None = typer.Option(
+            None,
+            "--agent",
+            help="Optional agent config path used for baseline snapshots.",
+        ),
+        save_baseline_flag: bool = typer.Option(
+            False,
+            "--save-baseline",
+            help="Save this diagnostic run as an AgentDoctor baseline.",
+        ),
+        baseline_name: str | None = typer.Option(
+            None,
+            "--baseline-name",
+            help="Optional human-readable name for a saved baseline.",
+        ),
+        compare_baseline_ref: str | None = typer.Option(
+            None,
+            "--compare-baseline",
+            help="Compare this run with a saved baseline. Use latest or a baseline name.",
+        ),
+        focus: str | None = typer.Option(
+            None,
+            "--focus",
+            help="Optional comma-separated failure-type focus tags.",
+        ),
     ) -> None:
-        raise typer.Exit(_cmd_deep(rounds, review, contract, out))
+        raise typer.Exit(
+            _cmd_deep(
+                rounds,
+                review,
+                contract,
+                out,
+                agent,
+                save_baseline_flag,
+                baseline_name,
+                compare_baseline_ref,
+                focus,
+            )
+        )
 
     @app.command()
     def auto(
@@ -726,6 +1008,26 @@ if _HAS_TYPER:
             "--repo-root",
             help="Repository root used for allowlisted auto patch targets.",
         ),
+        agent: Path | None = typer.Option(
+            None,
+            "--agent",
+            help="Optional agent config path used for baseline snapshots.",
+        ),
+        save_baseline_flag: bool = typer.Option(
+            False,
+            "--save-baseline",
+            help="Save this diagnostic run as an AgentDoctor baseline.",
+        ),
+        baseline_name: str | None = typer.Option(
+            None,
+            "--baseline-name",
+            help="Optional human-readable name for a saved baseline.",
+        ),
+        compare_baseline_ref: str | None = typer.Option(
+            None,
+            "--compare-baseline",
+            help="Compare this run with a saved baseline. Use latest or a baseline name.",
+        ),
     ) -> None:
         raise typer.Exit(
             _cmd_auto(
@@ -738,6 +1040,10 @@ if _HAS_TYPER:
                 contract,
                 out,
                 repo_root,
+                agent,
+                save_baseline_flag,
+                baseline_name,
+                compare_baseline_ref,
             )
         )
 
@@ -773,9 +1079,144 @@ if _HAS_TYPER:
             "--allow-auto",
             help="Allow triage to recommend auto mode when readiness checks pass.",
         ),
+        include_cost: bool = typer.Option(
+            False,
+            "--include-cost",
+            help="Also write a static pre-run time/cost estimate from the triage report.",
+        ),
     ) -> None:
         raise typer.Exit(
-            _cmd_triage(agent, goal, project_root, triage_format, output, allow_auto)
+            _cmd_triage(
+                agent,
+                goal,
+                project_root,
+                triage_format,
+                output,
+                allow_auto,
+                include_cost,
+            )
+        )
+
+    @app.command(name="cost-estimate")
+    def cost_estimate(
+        from_triage: Path | None = typer.Option(
+            None,
+            "--from-triage",
+            help="Path to a triage JSON report. Defaults to .agentdoctor/triage/latest.json.",
+        ),
+        mode: str | None = typer.Option(
+            None,
+            "--mode",
+            help="Mode to estimate: quick, deep, or auto. Defaults to the triage recommendation.",
+        ),
+        budget: str = typer.Option(
+            "balanced",
+            "--budget",
+            help="Budget profile: conservative, balanced, or thorough.",
+        ),
+        max_rounds: int | None = typer.Option(None, "--max-rounds"),
+        max_tests: int | None = typer.Option(None, "--max-tests"),
+        max_runtime_minutes: int | None = typer.Option(None, "--max-runtime-minutes"),
+        max_llm_calls: int | None = typer.Option(None, "--max-llm-calls"),
+        max_tool_calls: int | None = typer.Option(None, "--max-tool-calls"),
+        max_tool_calls_per_test: int | None = typer.Option(
+            None,
+            "--max-tool-calls-per-test",
+        ),
+        max_repeated_runs: int | None = typer.Option(None, "--max-repeated-runs"),
+        max_auto_iterations: int | None = typer.Option(None, "--max-auto-iterations"),
+        max_patch_attempts: int | None = typer.Option(None, "--max-patch-attempts"),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            help="Report output directory. Defaults to .agentdoctor/cost/ under the project root.",
+        ),
+        cost_format: str = typer.Option(
+            "markdown",
+            "--format",
+            help="Terminal output format: markdown summary or full json. Reports always write both.",
+        ),
+    ) -> None:
+        raise typer.Exit(
+            _cmd_cost_estimate(
+                from_triage,
+                mode,
+                budget,
+                max_rounds,
+                max_tests,
+                max_runtime_minutes,
+                max_llm_calls,
+                max_tool_calls,
+                max_tool_calls_per_test,
+                max_repeated_runs,
+                max_auto_iterations,
+                max_patch_attempts,
+                output,
+                cost_format,
+            )
+        )
+
+    @app.command(name="patch-preview")
+    def patch_preview_command(
+        from_run: Path | None = typer.Option(
+            None,
+            "--from-run",
+            help="Path to a diagnostic run/report JSON file.",
+        ),
+        from_findings: Path | None = typer.Option(
+            None,
+            "--from-findings",
+            help="Path to a findings/report JSON file.",
+        ),
+        failure_type: str | None = typer.Option(
+            None,
+            "--failure-type",
+            help="Optional failure type filter, such as OUTPUT_SCHEMA_ERROR.",
+        ),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Output directory. Defaults to .agentdoctor/patches/.",
+        ),
+        patch_format: str = typer.Option(
+            "markdown",
+            "--format",
+            help="Terminal output format: markdown or json. Reports always write both formats.",
+        ),
+        dry_run: bool = typer.Option(
+            True,
+            "--dry-run/--no-dry-run",
+            help="Preview-only mode. Patch Preview v0.1 never applies by default.",
+        ),
+        allow_apply: bool = typer.Option(
+            False,
+            "--allow-apply",
+            help="Accepted for forward compatibility; v0.1 remains preview-only.",
+        ),
+        apply_patch_id: str | None = typer.Option(
+            None,
+            "--apply",
+            help="Patch id to apply. v0.1 refuses apply and writes a preview-only report.",
+        ),
+        project_root: Path = typer.Option(
+            Path("."),
+            "--project-root",
+            help="Project root used for safe target selection.",
+        ),
+    ) -> None:
+        raise typer.Exit(
+            _cmd_patch_preview(
+                from_run,
+                from_findings,
+                failure_type,
+                output,
+                patch_format,
+                dry_run,
+                allow_apply,
+                apply_patch_id,
+                project_root,
+            )
         )
 
     @app.command()
@@ -954,6 +1395,10 @@ def _main_argparse() -> int:
     quick_parser = subparsers.add_parser("quick")
     quick_parser.add_argument("--contract", type=Path)
     quick_parser.add_argument("--out", "-o", default=Path("reports"), type=Path)
+    quick_parser.add_argument("--agent", type=Path)
+    quick_parser.add_argument("--save-baseline", action="store_true")
+    quick_parser.add_argument("--baseline-name")
+    quick_parser.add_argument("--compare-baseline", nargs="?", const="latest")
 
     deep_parser = subparsers.add_parser("deep")
     deep_parser.add_argument("--rounds", required=True, type=int)
@@ -964,6 +1409,11 @@ def _main_argparse() -> int:
     )
     deep_parser.add_argument("--contract", type=Path)
     deep_parser.add_argument("--out", "-o", default=Path("reports"), type=Path)
+    deep_parser.add_argument("--agent", type=Path)
+    deep_parser.add_argument("--save-baseline", action="store_true")
+    deep_parser.add_argument("--baseline-name")
+    deep_parser.add_argument("--compare-baseline", nargs="?", const="latest")
+    deep_parser.add_argument("--focus")
 
     auto_parser = subparsers.add_parser("auto")
     auto_parser.add_argument("--target-confidence", type=float, default=0.85)
@@ -979,6 +1429,10 @@ def _main_argparse() -> int:
     auto_parser.add_argument("--contract", type=Path)
     auto_parser.add_argument("--out", "-o", default=Path("reports"), type=Path)
     auto_parser.add_argument("--repo-root", default=Path("."), type=Path)
+    auto_parser.add_argument("--agent", type=Path)
+    auto_parser.add_argument("--save-baseline", action="store_true")
+    auto_parser.add_argument("--baseline-name")
+    auto_parser.add_argument("--compare-baseline", nargs="?", const="latest")
 
     triage_parser = subparsers.add_parser("triage")
     triage_parser.add_argument("--agent", type=Path)
@@ -991,6 +1445,46 @@ def _main_argparse() -> int:
     )
     triage_parser.add_argument("--output", type=Path)
     triage_parser.add_argument("--allow-auto", action="store_true")
+    triage_parser.add_argument("--include-cost", action="store_true")
+
+    cost_parser = subparsers.add_parser("cost-estimate")
+    cost_parser.add_argument("--from-triage", type=Path)
+    cost_parser.add_argument("--mode", choices=("quick", "deep", "auto"))
+    cost_parser.add_argument(
+        "--budget",
+        choices=("conservative", "balanced", "thorough"),
+        default="balanced",
+    )
+    cost_parser.add_argument("--max-rounds", type=int)
+    cost_parser.add_argument("--max-tests", type=int)
+    cost_parser.add_argument("--max-runtime-minutes", type=int)
+    cost_parser.add_argument("--max-llm-calls", type=int)
+    cost_parser.add_argument("--max-tool-calls", type=int)
+    cost_parser.add_argument("--max-tool-calls-per-test", type=int)
+    cost_parser.add_argument("--max-repeated-runs", type=int)
+    cost_parser.add_argument("--max-auto-iterations", type=int)
+    cost_parser.add_argument("--max-patch-attempts", type=int)
+    cost_parser.add_argument("--output", type=Path)
+    cost_parser.add_argument(
+        "--format",
+        choices=("markdown", "json"),
+        default="markdown",
+    )
+
+    patch_preview_parser = subparsers.add_parser("patch-preview")
+    patch_preview_parser.add_argument("--from-run", type=Path)
+    patch_preview_parser.add_argument("--from-findings", type=Path)
+    patch_preview_parser.add_argument("--failure-type")
+    patch_preview_parser.add_argument("--output", "-o", type=Path)
+    patch_preview_parser.add_argument(
+        "--format",
+        choices=("markdown", "json"),
+        default="markdown",
+    )
+    patch_preview_parser.add_argument("--dry-run", action="store_true", default=True)
+    patch_preview_parser.add_argument("--allow-apply", action="store_true")
+    patch_preview_parser.add_argument("--apply", dest="apply_patch_id")
+    patch_preview_parser.add_argument("--project-root", default=Path("."), type=Path)
 
     counterexamples_parser = subparsers.add_parser("counterexamples")
     counterexamples_parser.add_argument("contract", type=Path)
@@ -1060,9 +1554,26 @@ def _main_argparse() -> int:
         _cmd_demo(args.out)
         return 0
     if args.command == "quick":
-        return _cmd_quick(args.contract, args.out)
+        return _cmd_quick(
+            args.contract,
+            args.out,
+            args.agent,
+            args.save_baseline,
+            args.baseline_name,
+            args.compare_baseline,
+        )
     if args.command == "deep":
-        return _cmd_deep(args.rounds, args.review, args.contract, args.out)
+        return _cmd_deep(
+            args.rounds,
+            args.review,
+            args.contract,
+            args.out,
+            args.agent,
+            args.save_baseline,
+            args.baseline_name,
+            args.compare_baseline,
+            args.focus,
+        )
     if args.command == "auto":
         return _cmd_auto(
             args.target_confidence,
@@ -1074,6 +1585,10 @@ def _main_argparse() -> int:
             args.contract,
             args.out,
             args.repo_root,
+            args.agent,
+            args.save_baseline,
+            args.baseline_name,
+            args.compare_baseline,
         )
     if args.command == "triage":
         return _cmd_triage(
@@ -1083,6 +1598,36 @@ def _main_argparse() -> int:
             args.format,
             args.output,
             args.allow_auto,
+            args.include_cost,
+        )
+    if args.command == "cost-estimate":
+        return _cmd_cost_estimate(
+            args.from_triage,
+            args.mode,
+            args.budget,
+            args.max_rounds,
+            args.max_tests,
+            args.max_runtime_minutes,
+            args.max_llm_calls,
+            args.max_tool_calls,
+            args.max_tool_calls_per_test,
+            args.max_repeated_runs,
+            args.max_auto_iterations,
+            args.max_patch_attempts,
+            args.output,
+            args.format,
+        )
+    if args.command == "patch-preview":
+        return _cmd_patch_preview(
+            args.from_run,
+            args.from_findings,
+            args.failure_type,
+            args.output,
+            args.format,
+            args.dry_run,
+            args.allow_apply,
+            args.apply_patch_id,
+            args.project_root,
         )
     if args.command == "counterexamples":
         _cmd_counterexamples(args.contract, args.out)
@@ -1132,4 +1677,4 @@ def _main_argparse() -> int:
 
 
 if __name__ == "__main__":
-    app()
+    main()

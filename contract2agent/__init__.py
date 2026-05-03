@@ -1,5 +1,7 @@
 """AgentTraceDoctor compatibility package for offline agent trace diagnosis."""
 
+__version__ = "0.1.0"
+
 from contract2agent.capabilities import (
     CapabilityReport,
     CapabilitySpec,
@@ -19,6 +21,32 @@ from contract2agent.diagnostic_modes import (
     run_deep_diagnosis,
     run_quick_diagnosis,
 )
+from contract2agent.baseline import (
+    AgentStateSnapshot,
+    BaselineComparison,
+    BaselineRecord,
+    build_patch_preview_baseline_context,
+    build_rollback_recommendation,
+    compare_against_baseline,
+    detect_baseline_status,
+    save_baseline,
+)
+from contract2agent.failure_taxonomy import (
+    FailureClassifier,
+    FailurePlaybookEntry,
+    FailureType,
+    Finding,
+    FindingAggregator,
+    FixStrategy,
+    FixStrategyRouter,
+    GroupedFinding,
+    PotentialRisk,
+    Severity,
+    build_validation_plan,
+    compare_failure_taxonomy,
+    select_next_round_tags,
+    summarize_time_cost_by_failure_type,
+)
 from contract2agent.diagnosis import (
     DiagnosisIssue,
     DiagnosisReport,
@@ -28,6 +56,12 @@ from contract2agent.diagnosis import (
     generate_regression_trace_for_issue,
     suggest_minimal_patch,
     write_regression_traces,
+)
+from contract2agent.patch_preview import (
+    PatchPreviewOptions,
+    PatchPreviewReport,
+    PatchProposal,
+    run_patch_preview,
 )
 from contract2agent.schema import AgentContract, ForbiddenCapabilitySpec
 
@@ -42,12 +76,34 @@ __all__ = [
     "DiagnosticRound",
     "ForbiddenCapabilitySpec",
     "AgentDiagnosticReport",
+    "AgentStateSnapshot",
+    "BaselineComparison",
+    "BaselineRecord",
+    "build_patch_preview_baseline_context",
+    "FailureClassifier",
+    "FailurePlaybookEntry",
+    "FailureType",
+    "Finding",
+    "FindingAggregator",
+    "FixStrategy",
+    "FixStrategyRouter",
+    "GroupedFinding",
+    "PotentialRisk",
+    "PatchPreviewOptions",
+    "PatchPreviewReport",
+    "PatchProposal",
     "ReviewItem",
     "ReviewPolicy",
+    "Severity",
     "TestCase",
     "build_rule_coverage_matrix",
+    "build_rollback_recommendation",
+    "build_validation_plan",
     "capability_to_eval_case",
+    "compare_failure_taxonomy",
     "compute_diagnostic_confidence",
+    "compare_against_baseline",
+    "detect_baseline_status",
     "diagnose_evaluation",
     "explain_trace_result",
     "generate_capability_report",
@@ -55,9 +111,11 @@ __all__ = [
     "generate_regression_trace_for_issue",
     "run_auto_diagnosis",
     "run_deep_diagnosis",
+    "run_patch_preview",
     "run_quick_diagnosis",
+    "save_baseline",
+    "select_next_round_tags",
     "suggest_minimal_patch",
+    "summarize_time_cost_by_failure_type",
     "write_regression_traces",
 ]
-
-__version__ = "0.1.0"

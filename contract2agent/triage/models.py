@@ -47,19 +47,21 @@ SIDE_EFFECT_LEVELS = {
     "unknown",
 }
 FAILURE_TYPES = {
+    "CONFIG_ERROR",
     "TASK_INCOMPLETE",
     "TOOL_MISSING",
     "TOOL_ORDER_ERROR",
+    "TOOL_ARGUMENT_ERROR",
     "FORBIDDEN_TOOL_CALL",
     "OUTPUT_FORMAT_ERROR",
     "OUTPUT_SCHEMA_ERROR",
     "ERROR_HANDLING_MISSING",
     "HALLUCINATION_RISK",
     "LOOP_RISK",
-    "REGRESSION",
     "LOW_STABILITY",
+    "REGRESSION",
     "SAFETY_RISK",
-    "CONFIG_ERROR",
+    "SCORER_UNCERTAIN",
     "UNKNOWN",
 }
 
@@ -188,6 +190,8 @@ class BaselineStatus:
     mode: str | None = None
     confidence: float | None = None
     agent_name: str | None = None
+    baseline_id: str | None = None
+    baseline_quality: str | None = None
     warning: str | None = None
 
 
