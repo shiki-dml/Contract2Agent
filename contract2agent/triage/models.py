@@ -188,6 +188,8 @@ class BaselineStatus:
     mode: str | None = None
     confidence: float | None = None
     agent_name: str | None = None
+    baseline_id: str | None = None
+    baseline_quality: str | None = None
     warning: str | None = None
 
 

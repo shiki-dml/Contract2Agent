@@ -11,9 +11,12 @@ py_created_dir/
 .venv_uv/
 .deps/
 .tmp/
+.tmp_pytest_base/
 .uv-cache/
 .uv-python/
 .agentdoctor/triage/
+.agentdoctor/baselines/
+.agentdoctor/reports/
 pip_tmp/
 pytest-cache-files-*/
 build/
