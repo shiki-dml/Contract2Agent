@@ -1,0 +1,14 @@
+from __future__ import annotations
+
+
+def pdf_reader(path: str) -> dict[str, str]:
+    if "missing" in path.lower():
+        return {"status": "file_not_found", "content": ""}
+    return {
+        "status": "ok",
+        "content": "Definition 1... Theorem 1... Proof idea...",
+    }
+
+
+def markdown_writer(path: str, content: str) -> dict[str, str]:
+    return {"status": "ok", "path": path}

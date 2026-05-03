@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Callable
+
+from agent.tools import markdown_writer, pdf_reader
+from contract_runtime.monitor import ContractMonitor
+from contract_runtime.trace import TraceRecorder
+
+ToolFn = Callable[..., dict[str, Any]]
+
+SYSTEM_PROMPT = """You are {{ contract_name }}.
+
+Goal:
+{{ contract_goal }}
+
+{{ forbidden_capability_prompt }}
+"""
+
+FORBIDDEN_CAPABILITIES = {{ forbidden_capabilities_repr }}
+REFUSAL_MESSAGE = (
+    "I cannot help with that request because it is forbidden by the agent contract."
+)
+
+
+def run_agent(
+    input_path: str,
+    output_path: str = "notes.md",
+    tools: dict[str, ToolFn] | None = None,
+    contract_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Run a deterministic paper-reader agent and return output plus trace."""
+    toolset = tools or {
+        "pdf_reader": pdf_reader,
+        "markdown_writer": markdown_writer,
+    }
+    root = Path(__file__).resolve().parents[1]
+    monitor = ContractMonitor.from_yaml(contract_path or root / "agent_contract.yaml")
+    trace = TraceRecorder()
+    trace.user_input(str(input_path))
+
+    forbidden_capability = _matching_forbidden_capability(
+        str(input_path),
+        monitor.contract.get("forbidden_capabilities", FORBIDDEN_CAPABILITIES),
+    )
+    if forbidden_capability is not None:
+        trace.final_output(REFUSAL_MESSAGE)
+        return {
+            "status": "refused",
+            "output": REFUSAL_MESSAGE,
+            "trace": trace.events,
+            "violated_capability": forbidden_capability.get("name"),
+        }
+
+    pdf_args = {"path": input_path}
+    monitor.before_tool_call("pdf_reader", pdf_args, trace.events)
+    trace.tool_call("pdf_reader", pdf_args)
+    pdf_result = toolset["pdf_reader"](input_path)
+    trace.tool_result("pdf_reader", pdf_result)
+    monitor.after_tool_result("pdf_reader", pdf_result)
+
+    if pdf_result.get("status") == "file_not_found":
+        final_output = f"Error: file not found: {input_path}"
+        trace.final_output(final_output)
+        return {
+            "status": "file_not_found",
+            "output": final_output,
+            "trace": trace.events,
+        }
+
+    notes = build_markdown_notes(str(pdf_result.get("content", "")))
+    writer_args = {"path": output_path}
+    monitor.before_tool_call("markdown_writer", writer_args, trace.events)
+    trace.tool_call("markdown_writer", writer_args)
+    writer_result = toolset["markdown_writer"](output_path, notes)
+    trace.tool_result("markdown_writer", writer_result)
+    monitor.after_tool_result("markdown_writer", writer_result)
+    trace.final_output(notes)
+
+    return {
+        "status": writer_result.get("status", "ok"),
+        "output": notes,
+        "trace": trace.events,
+    }
+
+
+def build_markdown_notes(content: str) -> str:
+    return (
+        "## Definitions\n"
+        "- Definition 1: extracted from the paper text.\n\n"
+        "## Theorems\n"
+        "- Theorem 1: extracted from the paper text.\n\n"
+        "## Proof ideas\n"
+        "- Proof idea: summarize the main proof strategy.\n\n"
+        "## Source excerpt\n"
+        f"{content}\n"
+    )
+
+
+def _matching_forbidden_capability(
+    user_input: str,
+    capabilities: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    text = user_input.casefold()
+    for capability in capabilities:
+        for keyword in capability.get("keywords", []):
+            normalized = str(keyword).casefold()
+            if normalized and normalized in text:
+                return capability
+    return None

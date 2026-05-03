@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+class ContractViolation(RuntimeError):
+    pass
+
+
+class ContractMonitor:
+    def __init__(self, contract: dict[str, Any]):
+        self.contract = contract
+        self.successful_tools: set[str] = set()
+        self.tool_statuses: dict[str, list[str]] = {}
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "ContractMonitor":
+        contract = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        return cls(contract)
+
+    def before_tool_call(
+        self,
+        tool: str,
+        args: dict[str, Any],
+        trace: list[dict[str, Any]],
+    ) -> None:
+        del args
+        self._check_max_steps(trace)
+        self._check_forbidden_tool(tool)
+        self._check_required_tools(tool)
+        self._check_error_forbid_rules(tool)
+
+    def after_tool_result(self, tool: str, result: dict[str, Any]) -> None:
+        status = str(result.get("status", ""))
+        self.tool_statuses.setdefault(tool, []).append(status)
+        if status == "ok":
+            self.successful_tools.add(tool)
+
+    def _check_max_steps(self, trace: list[dict[str, Any]]) -> None:
+        max_steps = int(self.contract.get("limits", {}).get("max_steps", 6))
+        for rule in self.contract.get("rules", []):
+            if rule.get("kind") == "max_steps":
+                max_steps = int(rule.get("params", {}).get("max_steps", max_steps))
+        if len(trace) + 1 > max_steps:
+            raise ContractViolation(f"max_steps exceeded: {max_steps}")
+
+    def _check_forbidden_tool(self, tool: str) -> None:
+        forbidden_sources: dict[str, list[str]] = {}
+        for forbidden_tool in self.contract.get("forbidden_tools", []):
+            forbidden_sources.setdefault(str(forbidden_tool), []).append(
+                "forbidden_tools"
+            )
+        for capability in self.contract.get("forbidden_capabilities", []):
+            capability_name = str(capability.get("name", "forbidden_capability"))
+            for forbidden_tool in capability.get("forbidden_tools", []):
+                sources = forbidden_sources.setdefault(str(forbidden_tool), [])
+                if capability_name not in sources:
+                    sources.append(capability_name)
+        for rule in self.contract.get("rules", []):
+            if rule.get("kind") == "forbid_tool":
+                forbidden_tool = rule.get("params", {}).get("tool")
+                if forbidden_tool:
+                    forbidden_sources.setdefault(str(forbidden_tool), []).append(
+                        f"rule:{rule.get('name', 'forbid_tool')}"
+                    )
+        if tool in forbidden_sources:
+            capability = self._source_label(forbidden_sources[tool])
+            raise ContractViolation(
+                f"forbidden tool called: {tool}; violated capability: {capability}"
+            )
+
+    def _source_label(self, sources: list[str]) -> str:
+        for source in sources:
+            if source != "forbidden_tools" and not source.startswith("rule:"):
+                return source
+        return sources[0] if sources else "forbidden_tools"
+
+    def _check_required_tools(self, tool: str) -> None:
+        for rule in self.contract.get("rules", []):
+            if rule.get("kind") != "require_tool_before_tool":
+                continue
+            params = rule.get("params", {})
+            if params.get("tool") != tool:
+                continue
+            required_tool = params.get("required_tool")
+            if required_tool not in self.successful_tools:
+                raise ContractViolation(
+                    f"{tool} requires successful {required_tool} before it can run"
+                )
+
+    def _check_error_forbid_rules(self, tool: str) -> None:
+        for rule in self.contract.get("rules", []):
+            if rule.get("kind") != "forbid_tool_after_tool_error":
+                continue
+            params = rule.get("params", {})
+            if params.get("tool") != tool:
+                continue
+            after_tool = params.get("after_tool")
+            error_status = params.get("error_status")
+            if error_status in self.tool_statuses.get(after_tool, []):
+                raise ContractViolation(
+                    f"{tool} is forbidden after {after_tool} returned {error_status}"
+                )

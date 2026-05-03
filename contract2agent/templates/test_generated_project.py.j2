@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from agent.agent import run_agent
+from contract_runtime.trace import check_trace, load_trace
+
+
+def test_passing_trace_satisfies_contract() -> None:
+    contract = yaml.safe_load((ROOT / "agent_contract.yaml").read_text(encoding="utf-8"))
+    trace = load_trace(ROOT / "traces" / "passing_trace.json")
+    assert check_trace(contract, trace)["passed"]
+
+
+def test_generated_agent_handles_missing_file_without_writing() -> None:
+    contract = yaml.safe_load((ROOT / "agent_contract.yaml").read_text(encoding="utf-8"))
+    result = run_agent("missing.pdf")
+    called_tools = {
+        event["tool"]
+        for event in result["trace"]
+        if event.get("type") == "tool_call"
+    }
+    assert "pdf_reader" in called_tools
+    assert "markdown_writer" not in called_tools
+    assert "file not found" in result["output"].lower()
+    assert check_trace(contract, result["trace"])["passed"]

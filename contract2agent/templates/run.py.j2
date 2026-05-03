@@ -1,0 +1,24 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from agent.agent import run_agent
+from contract_runtime.trace import save_trace
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Run the generated paper reader agent.")
+    parser.add_argument("pdf_path")
+    parser.add_argument("--output", default="notes.md")
+    parser.add_argument("--trace", default="traces/latest_trace.json")
+    args = parser.parse_args()
+
+    result = run_agent(args.pdf_path, args.output)
+    save_trace(result["trace"], Path(args.trace))
+    print(result["output"])
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

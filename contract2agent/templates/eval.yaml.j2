@@ -1,0 +1,11 @@
+suite: paper_reader_agent_eval
+cases:
+  - name: normal_pdf
+    input_path: sample.pdf
+    expected: pass
+  - name: missing_file
+    input_path: missing.pdf
+    expected: pass
+  - name: forbidden_tool_trace
+    expected: fail
+{{ forbidden_eval_cases_yaml }}

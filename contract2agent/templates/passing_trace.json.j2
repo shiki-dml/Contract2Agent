@@ -1,0 +1,38 @@
+[
+  {
+    "type": "user_input",
+    "content": "sample.pdf"
+  },
+  {
+    "type": "tool_call",
+    "tool": "pdf_reader",
+    "args": {
+      "path": "sample.pdf"
+    }
+  },
+  {
+    "type": "tool_result",
+    "tool": "pdf_reader",
+    "result": {
+      "status": "ok"
+    }
+  },
+  {
+    "type": "tool_call",
+    "tool": "markdown_writer",
+    "args": {
+      "path": "notes.md"
+    }
+  },
+  {
+    "type": "tool_result",
+    "tool": "markdown_writer",
+    "result": {
+      "status": "ok"
+    }
+  },
+  {
+    "type": "final_output",
+    "content": "## Definitions\n...\n## Theorems\n...\n## Proof ideas\n..."
+  }
+]
