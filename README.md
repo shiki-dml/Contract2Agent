@@ -347,6 +347,131 @@ In non-interactive CLI environments, AgentDoctor does not block forever waiting
 for input. It marks `review_required=true` in the report and follows a safe
 default for the mode.
 
+## Baselines and Agent State Snapshots
+
+An AgentDoctor baseline is a saved diagnostic reference for an agent: how the
+agent performed under one mode, one configuration, and one eval/test suite. An
+agent state snapshot is the matching saved state for that baseline: config,
+prompt, tool, workflow, eval, model, patch, git, environment, and file-hash
+metadata.
+
+The distinction is intentional:
+
+- Baseline = performance/result.
+- Snapshot = agent state/config.
+
+Use `deep` mode for stable baselines. `quick` can save a baseline, but it is an
+incomplete smoke diagnosis and is usually a weaker regression reference.
+
+Save a baseline:
+
+```powershell
+agentdoctor deep --rounds 3 --save-baseline
+agentdoctor deep --rounds 3 --save-baseline --baseline-name stable-v1
+agentdoctor quick --save-baseline
+agentdoctor auto --target-confidence 0.85 --save-baseline
+```
+
+Compare a future run with the latest or a named baseline:
+
+```powershell
+agentdoctor deep --rounds 3 --compare-baseline
+agentdoctor deep --rounds 3 --compare-baseline latest
+agentdoctor deep --rounds 3 --compare-baseline stable-v1
+agentdoctor auto --target-confidence 0.85 --compare-baseline
+```
+
+If you select an agent config, the same path is used for snapshot identity and
+hashing:
+
+```powershell
+agentdoctor deep --agent ./agent.yaml --rounds 3 --save-baseline --baseline-name stable-v1
+agentdoctor deep --agent ./agent.yaml --rounds 3 --compare-baseline stable-v1
+```
+
+Baseline artifacts are local JSON and Markdown files under `.agentdoctor/`:
+
+```text
+.agentdoctor/
+  baselines/
+    latest.json
+    baseline_<timestamp>/
+      baseline.json
+      snapshot.json
+      file_hashes.json
+      baseline_saved.md
+      comparison_latest.json
+      comparison_latest.md
+      copied_configs/
+```
+
+`baseline.json` stores the `BaselineRecord`: diagnostic summary, confidence
+summary, per-test statuses, failure taxonomy counts, review summary, measured
+time data when available, patch history summary, eval suite summary, report
+paths, baseline quality, and a reference to the snapshot.
+
+`snapshot.json` stores the `AgentStateSnapshot`: agent identity, model state,
+prompt state, tool state, workflow/review/approval state, eval state, patch
+state, git state when available, runtime environment, stable SHA-256 file
+hashes, copied safe config files, excluded file patterns, and warnings.
+
+Safe snapshot files copied by default include:
+
+```text
+agent.yaml, agent.yml, agent.json
+prompts/*.md, prompts/*.txt
+prompt.md, system_prompt.md, instructions.md
+tool_descriptions.yaml, tool_descriptions.yml
+tools.yaml, tools.yml
+workflow_config.yaml, workflow_config.yml
+eval_config.yaml, eval_config.yml
+agentdoctor.yaml, agentdoctor.yml
+.agentdoctor/config.yaml, .agentdoctor/config.yml
+```
+
+Eval files such as `evals/*.yaml`, `evals/*.yml`, and `evals/*.json` are hashed
+and included in eval-suite comparison metadata. Large allowlisted files over 1
+MB are hashed when possible but not copied.
+
+Secret and build/cache files are excluded and their contents are not read,
+copied, printed, or written to reports:
+
+```text
+.env, .env.*, *.key, *.pem, *.crt
+secrets.*, credentials.*, token.*, auth.*
+node_modules/, .venv/, venv/, .git/, dist/, build/, __pycache__/
+```
+
+Baseline comparison detects:
+
+- diagnostic confidence delta
+- pass/fail/warning delta
+- test regressions, improvements, new tests, and removed tests
+- failure type changes such as `OUTPUT_SCHEMA_ERROR: 0 -> 3`
+- severity changes such as new critical findings
+- prompt/config/tool/workflow/eval hash changes
+- eval suite changes that make comparison partial
+- model, tool-list, review/approval, git, and dirty-state changes
+- measured runtime increases when timing data exists
+- rollback recommendations for severe regressions
+
+Failure taxonomy is stored even when only deterministic local inference is
+available. Future taxonomy modules can populate the same fields directly.
+Comparison tracks counts such as `SAFETY_RISK: 0 -> 1` and uses new critical
+`SAFETY_RISK` or `FORBIDDEN_TOOL_CALL` evidence as strong rollback signals.
+
+Auto mode can use baseline comparison data to detect regressions, overfitting,
+and rollback candidates. In v0.1, AgentDoctor writes the comparison and
+recommendation; it does not automatically roll back baseline files as part of
+baseline comparison.
+
+Limitations in v0.1:
+
+- Baselines are local files only; there is no database or cloud sync.
+- Comparison is partial when eval suites, modes, or metadata differ.
+- Possible causes are candidate explanations, not definitive root causes.
+- Token or dollar costs are not invented when usage data is unavailable.
+
 ## Diagnostic Confidence
 
 Diagnostic confidence is a deterministic heuristic score, not a mathematical

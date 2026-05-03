@@ -1,5 +1,7 @@
 """AgentTraceDoctor compatibility package for offline agent trace diagnosis."""
 
+__version__ = "0.1.0"
+
 from contract2agent.capabilities import (
     CapabilityReport,
     CapabilitySpec,
@@ -18,6 +20,16 @@ from contract2agent.diagnostic_modes import (
     run_auto_diagnosis,
     run_deep_diagnosis,
     run_quick_diagnosis,
+)
+from contract2agent.baseline import (
+    AgentStateSnapshot,
+    BaselineComparison,
+    BaselineRecord,
+    build_patch_preview_baseline_context,
+    build_rollback_recommendation,
+    compare_against_baseline,
+    detect_baseline_status,
+    save_baseline,
 )
 from contract2agent.diagnosis import (
     DiagnosisIssue,
@@ -42,12 +54,19 @@ __all__ = [
     "DiagnosticRound",
     "ForbiddenCapabilitySpec",
     "AgentDiagnosticReport",
+    "AgentStateSnapshot",
+    "BaselineComparison",
+    "BaselineRecord",
+    "build_patch_preview_baseline_context",
     "ReviewItem",
     "ReviewPolicy",
     "TestCase",
     "build_rule_coverage_matrix",
+    "build_rollback_recommendation",
     "capability_to_eval_case",
     "compute_diagnostic_confidence",
+    "compare_against_baseline",
+    "detect_baseline_status",
     "diagnose_evaluation",
     "explain_trace_result",
     "generate_capability_report",
@@ -56,8 +75,7 @@ __all__ = [
     "run_auto_diagnosis",
     "run_deep_diagnosis",
     "run_quick_diagnosis",
+    "save_baseline",
     "suggest_minimal_patch",
     "write_regression_traces",
 ]
-
-__version__ = "0.1.0"

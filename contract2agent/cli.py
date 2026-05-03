@@ -2,9 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
+from contract2agent.baseline import (
+    compare_against_baseline,
+    format_baseline_saved_summary,
+    format_comparison_summary,
+    save_baseline,
+)
 from contract2agent.checker import CheckResult, check_trace, check_trace_file
 from contract2agent.compiler import (
     compile_contract,
@@ -203,11 +210,91 @@ def _mode_contract(contract: Path | None = None) -> Any:
     return default_contract()
 
 
-def _cmd_quick(contract: Path | None = None, out: Path = Path("reports")) -> int:
+def _command_string() -> str:
+    command = Path(sys.argv[0]).name
+    if command in {"cli.py", "__main__.py"}:
+        command = "agentdoctor"
+    return " ".join([command, *sys.argv[1:]])
+
+
+def _normalize_optional_compare_baseline_args(argv: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for index, item in enumerate(argv):
+        normalized.append(item)
+        if item != "--compare-baseline":
+            continue
+        next_item = argv[index + 1] if index + 1 < len(argv) else None
+        if next_item is None or next_item.startswith("-"):
+            normalized.append("latest")
+    return normalized
+
+
+def main() -> None:
+    sys.argv[:] = _normalize_optional_compare_baseline_args(sys.argv)
+    app()
+
+
+def _handle_baseline_actions(
+    *,
+    report: Any,
+    out: Path,
+    project_root: Path = Path("."),
+    agent: Path | None = None,
+    save_baseline_flag: bool = False,
+    baseline_name: str | None = None,
+    compare_baseline_ref: str | None = None,
+) -> int:
+    if save_baseline_flag:
+        saved = save_baseline(
+            report=report,
+            project_root=project_root,
+            baseline_name=baseline_name,
+            command=_command_string(),
+            agent_config_path=agent,
+            report_dir=out,
+        )
+        console.print("")
+        console.print(format_baseline_saved_summary(saved))
+
+    if compare_baseline_ref is not None:
+        compared = compare_against_baseline(
+            report=report,
+            project_root=project_root,
+            baseline_ref=compare_baseline_ref or "latest",
+            command=_command_string(),
+            agent_config_path=agent,
+        )
+        console.print("")
+        if compared.comparison is None:
+            console.print("Baseline Comparison")
+            for warning in compared.warnings:
+                console.print(f"Warning: {warning}")
+            return 1
+        console.print(format_comparison_summary(compared.comparison))
+        if compared.markdown_path is not None:
+            console.print(f"Wrote baseline comparison to {compared.markdown_path}")
+    return 0
+
+
+def _cmd_quick(
+    contract: Path | None = None,
+    out: Path = Path("reports"),
+    agent: Path | None = None,
+    save_baseline_flag: bool = False,
+    baseline_name: str | None = None,
+    compare_baseline_ref: str | None = None,
+) -> int:
     report = run_quick_diagnosis(contract=_mode_contract(contract), out_dir=out)
     console.print(format_console_report(report))
     console.print(f"Wrote diagnostic report to {out / 'latest.md'}")
-    return 0
+    return _handle_baseline_actions(
+        report=report,
+        out=out,
+        agent=agent,
+        save_baseline_flag=save_baseline_flag,
+        baseline_name=baseline_name,
+        compare_baseline_ref=compare_baseline_ref,
+    )
 
 
 def _cmd_deep(
@@ -215,6 +302,10 @@ def _cmd_deep(
     review: str = ReviewPolicy.ON_FAIL.value,
     contract: Path | None = None,
     out: Path = Path("reports"),
+    agent: Path | None = None,
+    save_baseline_flag: bool = False,
+    baseline_name: str | None = None,
+    compare_baseline_ref: str | None = None,
 ) -> int:
     report = run_deep_diagnosis(
         rounds=rounds,
@@ -224,7 +315,14 @@ def _cmd_deep(
     )
     console.print(format_console_report(report))
     console.print(f"Wrote diagnostic report to {out / 'latest.md'}")
-    return 0
+    return _handle_baseline_actions(
+        report=report,
+        out=out,
+        agent=agent,
+        save_baseline_flag=save_baseline_flag,
+        baseline_name=baseline_name,
+        compare_baseline_ref=compare_baseline_ref,
+    )
 
 
 def _cmd_auto(
@@ -237,6 +335,10 @@ def _cmd_auto(
     contract: Path | None = None,
     out: Path = Path("reports"),
     repo_root: Path = Path("."),
+    agent: Path | None = None,
+    save_baseline_flag: bool = False,
+    baseline_name: str | None = None,
+    compare_baseline_ref: str | None = None,
 ) -> int:
     for warning in auto_mode_warnings(target_confidence):
         console.print(warning)
@@ -253,7 +355,15 @@ def _cmd_auto(
     )
     console.print(format_console_report(report))
     console.print(f"Wrote diagnostic report to {out / 'latest.md'}")
-    return 0
+    return _handle_baseline_actions(
+        report=report,
+        out=out,
+        project_root=repo_root,
+        agent=agent,
+        save_baseline_flag=save_baseline_flag,
+        baseline_name=baseline_name,
+        compare_baseline_ref=compare_baseline_ref,
+    )
 
 
 def _cmd_check_all(
@@ -653,8 +763,37 @@ if _HAS_TYPER:
             "-o",
             help="Report output directory.",
         ),
+        agent: Path | None = typer.Option(
+            None,
+            "--agent",
+            help="Optional agent config path used for baseline snapshots.",
+        ),
+        save_baseline_flag: bool = typer.Option(
+            False,
+            "--save-baseline",
+            help="Save this diagnostic run as an AgentDoctor baseline.",
+        ),
+        baseline_name: str | None = typer.Option(
+            None,
+            "--baseline-name",
+            help="Optional human-readable name for a saved baseline.",
+        ),
+        compare_baseline_ref: str | None = typer.Option(
+            None,
+            "--compare-baseline",
+            help="Compare this run with a saved baseline. Use latest or a baseline name.",
+        ),
     ) -> None:
-        raise typer.Exit(_cmd_quick(contract, out))
+        raise typer.Exit(
+            _cmd_quick(
+                contract,
+                out,
+                agent,
+                save_baseline_flag,
+                baseline_name,
+                compare_baseline_ref,
+            )
+        )
 
     @app.command()
     def deep(
@@ -675,8 +814,39 @@ if _HAS_TYPER:
             "-o",
             help="Report output directory.",
         ),
+        agent: Path | None = typer.Option(
+            None,
+            "--agent",
+            help="Optional agent config path used for baseline snapshots.",
+        ),
+        save_baseline_flag: bool = typer.Option(
+            False,
+            "--save-baseline",
+            help="Save this diagnostic run as an AgentDoctor baseline.",
+        ),
+        baseline_name: str | None = typer.Option(
+            None,
+            "--baseline-name",
+            help="Optional human-readable name for a saved baseline.",
+        ),
+        compare_baseline_ref: str | None = typer.Option(
+            None,
+            "--compare-baseline",
+            help="Compare this run with a saved baseline. Use latest or a baseline name.",
+        ),
     ) -> None:
-        raise typer.Exit(_cmd_deep(rounds, review, contract, out))
+        raise typer.Exit(
+            _cmd_deep(
+                rounds,
+                review,
+                contract,
+                out,
+                agent,
+                save_baseline_flag,
+                baseline_name,
+                compare_baseline_ref,
+            )
+        )
 
     @app.command()
     def auto(
@@ -726,6 +896,26 @@ if _HAS_TYPER:
             "--repo-root",
             help="Repository root used for allowlisted auto patch targets.",
         ),
+        agent: Path | None = typer.Option(
+            None,
+            "--agent",
+            help="Optional agent config path used for baseline snapshots.",
+        ),
+        save_baseline_flag: bool = typer.Option(
+            False,
+            "--save-baseline",
+            help="Save this diagnostic run as an AgentDoctor baseline.",
+        ),
+        baseline_name: str | None = typer.Option(
+            None,
+            "--baseline-name",
+            help="Optional human-readable name for a saved baseline.",
+        ),
+        compare_baseline_ref: str | None = typer.Option(
+            None,
+            "--compare-baseline",
+            help="Compare this run with a saved baseline. Use latest or a baseline name.",
+        ),
     ) -> None:
         raise typer.Exit(
             _cmd_auto(
@@ -738,6 +928,10 @@ if _HAS_TYPER:
                 contract,
                 out,
                 repo_root,
+                agent,
+                save_baseline_flag,
+                baseline_name,
+                compare_baseline_ref,
             )
         )
 
@@ -954,6 +1148,10 @@ def _main_argparse() -> int:
     quick_parser = subparsers.add_parser("quick")
     quick_parser.add_argument("--contract", type=Path)
     quick_parser.add_argument("--out", "-o", default=Path("reports"), type=Path)
+    quick_parser.add_argument("--agent", type=Path)
+    quick_parser.add_argument("--save-baseline", action="store_true")
+    quick_parser.add_argument("--baseline-name")
+    quick_parser.add_argument("--compare-baseline", nargs="?", const="latest")
 
     deep_parser = subparsers.add_parser("deep")
     deep_parser.add_argument("--rounds", required=True, type=int)
@@ -964,6 +1162,10 @@ def _main_argparse() -> int:
     )
     deep_parser.add_argument("--contract", type=Path)
     deep_parser.add_argument("--out", "-o", default=Path("reports"), type=Path)
+    deep_parser.add_argument("--agent", type=Path)
+    deep_parser.add_argument("--save-baseline", action="store_true")
+    deep_parser.add_argument("--baseline-name")
+    deep_parser.add_argument("--compare-baseline", nargs="?", const="latest")
 
     auto_parser = subparsers.add_parser("auto")
     auto_parser.add_argument("--target-confidence", type=float, default=0.85)
@@ -979,6 +1181,10 @@ def _main_argparse() -> int:
     auto_parser.add_argument("--contract", type=Path)
     auto_parser.add_argument("--out", "-o", default=Path("reports"), type=Path)
     auto_parser.add_argument("--repo-root", default=Path("."), type=Path)
+    auto_parser.add_argument("--agent", type=Path)
+    auto_parser.add_argument("--save-baseline", action="store_true")
+    auto_parser.add_argument("--baseline-name")
+    auto_parser.add_argument("--compare-baseline", nargs="?", const="latest")
 
     triage_parser = subparsers.add_parser("triage")
     triage_parser.add_argument("--agent", type=Path)
@@ -1060,9 +1266,25 @@ def _main_argparse() -> int:
         _cmd_demo(args.out)
         return 0
     if args.command == "quick":
-        return _cmd_quick(args.contract, args.out)
+        return _cmd_quick(
+            args.contract,
+            args.out,
+            args.agent,
+            args.save_baseline,
+            args.baseline_name,
+            args.compare_baseline,
+        )
     if args.command == "deep":
-        return _cmd_deep(args.rounds, args.review, args.contract, args.out)
+        return _cmd_deep(
+            args.rounds,
+            args.review,
+            args.contract,
+            args.out,
+            args.agent,
+            args.save_baseline,
+            args.baseline_name,
+            args.compare_baseline,
+        )
     if args.command == "auto":
         return _cmd_auto(
             args.target_confidence,
@@ -1074,6 +1296,10 @@ def _main_argparse() -> int:
             args.contract,
             args.out,
             args.repo_root,
+            args.agent,
+            args.save_baseline,
+            args.baseline_name,
+            args.compare_baseline,
         )
     if args.command == "triage":
         return _cmd_triage(
@@ -1132,4 +1358,4 @@ def _main_argparse() -> int:
 
 
 if __name__ == "__main__":
-    app()
+    main()

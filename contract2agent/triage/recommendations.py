@@ -43,20 +43,25 @@ def evaluate_baseline_status(
     if discovery.baseline_path is None or not data.baseline_data:
         return BaselineStatus(exists=False, warning="No baseline found."), warnings
 
+    from contract2agent.baseline import detect_baseline_status
+
+    status = detect_baseline_status(discovery.project_root)
     baseline = data.baseline_data
-    created_at = _first_string(
+    created_at = status.created_at or _first_string(
         baseline.get("created_at"),
         baseline.get("timestamp"),
         baseline.get("finished_at"),
     )
-    mode = _first_string(baseline.get("mode"), baseline.get("diagnostic_mode"))
-    confidence = _to_float(baseline.get("confidence") or baseline.get("overall_confidence"))
-    agent_name = _first_string(
+    mode = status.mode or _first_string(baseline.get("mode"), baseline.get("diagnostic_mode"))
+    confidence = status.confidence
+    if confidence is None:
+        confidence = _to_float(baseline.get("confidence") or baseline.get("overall_confidence"))
+    agent_name = status.agent_name or _first_string(
         baseline.get("agent_name"),
         baseline.get("agent"),
         _mapping(baseline.get("agent_summary")).get("name"),
     )
-    warning_text = None
+    warning_text = status.warning
 
     if agent_summary and agent_name and agent_summary.name not in {None, "unknown"} and agent_name != agent_summary.name:
         warning_text = "Baseline appears to belong to a different agent."
@@ -88,11 +93,13 @@ def evaluate_baseline_status(
     return (
         BaselineStatus(
             exists=True,
-            path=_relative(discovery.project_root, discovery.baseline_path),
+            path=status.path or _relative(discovery.project_root, discovery.baseline_path),
             created_at=created_at,
             mode=mode,
             confidence=confidence,
             agent_name=agent_name,
+            baseline_id=status.baseline_id,
+            baseline_quality=status.baseline_quality,
             warning=warning_text,
         ),
         warnings,
