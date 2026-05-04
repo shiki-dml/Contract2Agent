@@ -14,7 +14,7 @@ theme:
 nav:
   - Home: index.md
   - Interactive Demo: demo.md
-  - Playground: playground.md
+  - Playground: playground/index.html
   - Getting Started:
       - Overview: getting-started.md
       - CLI Reference: cli.md

@@ -18,12 +18,12 @@ The fastest way to experience Contract2Agent is the public GitHub Pages demo:
 
 **[https://shiki-dml.github.io/Contract2Agent/playground/](https://shiki-dml.github.io/Contract2Agent/playground/)**
 
-The public demo is deployed from `docs/playground.md` through GitHub Pages.
+The public demo is deployed from `docs/playground/index.html` through GitHub Pages.
 
-For local preview without deployment, run MkDocs from your cloned repository and open the Playground page:
+For local preview, open this file directly from your cloned repository:
 
 ```text
-python -m mkdocs serve
+docs/playground/index.html
 ```
 
 The static demo is served directly from `docs/`. It lets users enter contract text, dispute facts, claimant and respondent positions, evidence, desired outcome, and configuration such as contract type, dispute type, output format, diagnosis depth, and risk mode.
@@ -70,7 +70,7 @@ Contract2Agent is built around reproducible diagnosis rather than one-off narrat
 - Golden tests protect stable diagnosis fields such as category, strictness, affected agent part, cause substrings, suggested patch type, and regression trace shape.
 - CLI smoke tests protect real commands such as `c2a demo`, `c2a check-all --diagnose`, `c2a diagnose`, and `c2a why`.
 - Report rendering tests protect Markdown reports and JSON-serializable structured output.
-- GitHub Pages static tests protect `docs/playground.md`, relative assets, no-backend behavior, copy actions, privacy/disclaimer text, and the Evaluation Lab.
+- GitHub Pages static tests protect `docs/playground/index.html`, relative assets, no-backend behavior, copy actions, privacy/disclaimer text, and the Evaluation Lab.
 
 The web Evaluation Lab shows how structured inputs become quality signals: Input Completeness, Evidence Coverage, Detected Issues, Clause Signals, Risk Signal, export readiness, and a Generated Test Case Preview. It mirrors the repository testing mindset, but it does not run pytest in the browser.
 
@@ -170,7 +170,7 @@ Package identity:
 .
 |-- contract2agent/        # Python package
 |-- docs/                  # GitHub Pages site and MkDocs documentation
-|   |-- playground.md      # Static Pages demo entry point
+|   |-- playground/        # Static Pages demo entry point
 |   |-- assets/            # CSS, JS, and SVG preview asset
 |   |-- examples/          # Static demo sample cases
 |   `-- audits/            # Preserved audit notes
@@ -196,7 +196,7 @@ The public site lives in `docs/` and is designed to deploy without npm, a backen
 
 GitHub Pages readiness checklist:
 
-- `docs/playground.md` exists and is the demo entry page.
+- `docs/playground/index.html` exists and is the demo entry page.
 - CSS, JavaScript, image, and example references use relative paths.
 - `docs/assets/styles.css`, `docs/assets/app.js`, and `docs/assets/contract2agent-preview.svg` exist when referenced.
 - No backend, build step, API key, LLM API, or dev server is required.

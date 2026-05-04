@@ -8,7 +8,7 @@
   </section>
 </div>
 
-[Try the Playground](playground.md){ .md-button .md-button--primary }
+[Try the Playground](playground/index.html){ .md-button .md-button--primary }
 [Read the Quickstart](getting-started.md){ .md-button }
 [View Diagnosis Categories](failure-taxonomy.md){ .md-button }
 
@@ -76,7 +76,7 @@ Add a rule forbidding markdown_writer after pdf_reader returns file_not_found.
 ## Start Here
 
 - New to the project: read [Getting Started](getting-started.md).
-- Want to try the diagnosis model quickly: open the [Playground](playground.md).
+- Want to try the diagnosis model quickly: open the [Playground](playground/index.html).
 - Need exact commands and flags: use the [CLI Reference](cli.md).
 - Reviewing categories: see [Failure Taxonomy](failure-taxonomy.md).
 

@@ -5,7 +5,7 @@ point Contract2Agent at a small agent config, then inspect the Markdown report.
 
 The examples use `c2a`.
 
-Want to try the idea before creating files? Open the [Playground](playground.md)
+Want to try the idea before creating files? Open the [Playground](playground/index.html)
 for a static browser-side preview.
 
 ## Install

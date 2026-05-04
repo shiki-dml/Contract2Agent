@@ -12,20 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_github_pages_entrypoint_references_existing_static_assets() -> None:
-    playground = ROOT / "docs" / "playground.md"
-    demo_html = ROOT / "docs" / "assets" / "contract2agent-demo.html"
-    playground_markdown = playground.read_text(encoding="utf-8")
+    demo_html = ROOT / "docs" / "playground" / "index.html"
     html = demo_html.read_text(encoding="utf-8")
 
-    assert "../assets/contract2agent-demo.html" in playground_markdown
-
     for asset in (
-        "styles.css",
-        "app.js",
-        "contract2agent-preview.svg",
+        "../assets/styles.css",
+        "../assets/app.js",
+        "../assets/contract2agent-preview.svg",
     ):
         assert asset in html
-        assert (demo_html.parent / asset).exists(), asset
+        assert (demo_html.parent / asset).resolve().exists(), asset
 
     assert "Contract2Agent" in html
     assert "not legal advice" in html
@@ -34,12 +30,11 @@ def test_github_pages_entrypoint_references_existing_static_assets() -> None:
 
 def test_github_pages_entrypoint_uses_deployable_relative_assets() -> None:
     docs_root = ROOT / "docs"
-    playground = docs_root / "playground.md"
-    demo_html = docs_root / "assets" / "contract2agent-demo.html"
+    demo_html = docs_root / "playground" / "index.html"
     html = demo_html.read_text(encoding="utf-8")
     css = (docs_root / "assets" / "styles.css").read_text(encoding="utf-8")
 
-    assert playground.exists()
+    assert (docs_root / "index.md").exists()
     assert not (docs_root / "index.html").exists()
     assert demo_html.exists()
     assert "localhost" not in html
@@ -58,7 +53,7 @@ def test_github_pages_entrypoint_uses_deployable_relative_assets() -> None:
 
 
 def test_github_pages_form_contains_required_dispute_inputs() -> None:
-    html = (ROOT / "docs" / "assets" / "contract2agent-demo.html").read_text(
+    html = (ROOT / "docs" / "playground" / "index.html").read_text(
         encoding="utf-8"
     )
 
@@ -238,7 +233,7 @@ def test_readme_explains_evaluation_first_design() -> None:
         "CLI smoke tests",
         "GitHub Pages static tests",
         "python -m pytest",
-        "docs/playground.md",
+        "docs/playground/index.html",
         "Copy Test Case JSON",
     ):
         assert required in readme
