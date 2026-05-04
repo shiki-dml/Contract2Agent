@@ -29,3 +29,4 @@
 *.ico binary
 *.pdf binary
 *.zip binary
+.agents/skills/**/*.md text eol=lf

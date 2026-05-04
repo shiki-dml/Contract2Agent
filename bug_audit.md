@@ -1,5 +1,122 @@
 # Contract2Agent Bug Audit
 
+## 2026-05-04 Lease Repair / Rent Abatement / Security Deposit Trigger-Gate Follow-Up
+
+### 1. What was wrong
+
+- The deterministic playground analyzer still handled a lease repair dispute through generic notice/cure, damages, invoice/payment, SaaS/SLA, and force-majeure template paths.
+- A force majeure clause mention plus negative fact text could still contaminate active issue outputs, dispute type, key issues, next steps, Evaluation Lab preview, and exports.
+- Lease-specific facts for roof repair, rent abatement, rent withholding, security deposit deductions, tenant-caused damage, property-damage causation, and base-rent liability limits were under-detected.
+
+### 2. Root cause
+
+- Clause signals and factual issue activation were still not separated for the lease family.
+- Existing issue-family gates covered prior SaaS, refund, force majeure, and confidentiality/IP regressions, but there was no lease issue-family registry or lease-specific generation path.
+- The generic notice/cure branch assumed invoice, suspension, order-form, or service-platform context.
+- The generic damages branch could emit lost-revenue wording whenever damages exclusions appeared, even when the facts requested display-fixture damages, rent abatement, deposit return, and repair-related remedies.
+- Evaluation Lab case naming used filtered active tags, but without a lease-specific case-name path it could still choose misleading generic families when active tags were wrong.
+
+### 3. Why force majeure was incorrectly activated
+
+- The contract contained a force majeure clause, and the fixture's negative sentence listed government orders, natural disasters, strikes, war, and force majeure events.
+- The correct behavior is clause-only: those terms are clause signals unless a party invokes force majeure, sends force-majeure notice, or claims delay/nonperformance was caused by an external uncontrollable event.
+- The fix keeps force majeure as `force majeure clause mentioned but not fact-triggered` and relies on blocker triggers to prevent active issue, dispute type, key issue, next-step, Evaluation Lab, and export activation.
+
+### 4. Why lease-specific issues were missing
+
+- There were no explicit lease-family gates for landlord maintenance, commercially reasonable repairs, rent abatement, unauthorized rent withholding/payment default, security deposit deductions, ordinary wear and tear, tenant-caused damage, or property-damage causation.
+- Rent withholding was too easy to confuse with generic payment/invoice disputes, even though lease rent withholding is not an invoice dispute.
+- Liability-cap extraction did not preserve the lease-specific `twelve months of base rent` language.
+
+### 5. Trigger-gate changes
+
+- Added lease issue families in `docs/assets/app.js`:
+  - `lease_maintenance`
+  - `rent_abatement`
+  - `rent_withholding`
+  - `security_deposit`
+  - `tenant_damage`
+- Added lease factual trigger helpers for:
+  - lease maintenance / repair obligation
+  - rent abatement
+  - rent withholding / payment default
+  - security deposit
+  - tenant-caused damage
+  - property damage causation
+- Added clause signals for lease schedule notice addresses, email plus certified mail notice, 10-business-day repair cure period, commercially reasonable repairs, rent abatement by affected period/area, unauthorized rent withholding as payment default, deposit deductions, itemized deposit statement timing, ordinary wear and tear, base-rent liability cap, and unpaid-rent / intentional-misconduct / tenant-caused-property-damage carve-outs.
+- Kept rent withholding separate from generic `payment` and `invoice dispute` active tags.
+
+### 6. Timeline role classification
+
+- Added lease timeline extraction for:
+  - September 3 water-intrusion discovery.
+  - September 4 tenant email notice.
+  - September 7 landlord response.
+  - September 15 roof contractor inspection.
+  - October rent withholding.
+  - October 12 roof repair completion.
+  - November 1 move-out / surrender.
+  - 30-day deposit statement deadline.
+  - 10-business-day repair cure period.
+  - email plus certified-mail deemed receipt rule.
+- The lease path returns role-specific timeline facts instead of falling through to generic notice/deemed-receipt text.
+
+### 7. Key issues, gaps, next steps, and risk
+
+- Added lease-specific key issues for notice method, lease schedule address, deemed receipt, cure period, commercially reasonable repair start, September 15 inspection, October 12 completion, material interference, rent abatement, 40% October rent withholding, $8,500 deposit deduction, roof-leak versus tenant-misuse causation, itemized statement timing, display-fixture damages, and the base-rent liability cap/carve-outs.
+- Added lease-specific evidence gaps and prevented signed-contract, invoice, SLA, integration-log, indemnity, IP-comparison, and lost-revenue gaps from being added to the lease branch.
+- Added lease-specific next steps and prevented invoice/suspension/SaaS/force-majeure/refund/indemnity/IP boilerplate from running.
+- Added lease-specific risk rationale and avoided generic suspension/termination wording in the lease risk rationale.
+
+### 8. Evaluation Lab and exports
+
+- Evaluation Lab preview now names the fixture `lease_repair_notice_abatement_deposit_golden`.
+- `must_include_issues` comes from final filtered `active_issue_tags`.
+- Markdown and JSON exports already used the final diagnosis object; the new tests assert active tags, key issues, clause signals, evidence gaps, risk rationale, timeline facts, suggested next steps, and legacy `issue_tags` match the filtered diagnosis.
+
+### 9. Files changed
+
+- `docs/assets/app.js`
+  - Added lease issue-family registry entries, factual triggers, clause signals, lease timeline extraction, lease key issues, lease evidence gaps, lease next steps, lease risk rationale, lease dispute types, and lease Evaluation Lab case naming.
+- `tests/test_docs_site.py`
+  - Added the Lease repair / rent abatement / security deposit fixture.
+  - Added regression assertions for active tags, forbidden issue families, clause-only force majeure, fact-specific key issues, role-classified timeline facts, evidence gaps, lease-specific next steps, Evaluation Lab preview, Markdown/JSON export parity, and cross-run contamination.
+- `bug_audit.md`
+  - Added this audit entry.
+
+### 10. Tests added or updated
+
+- `test_playground_lease_repair_abatement_filters_false_issue_families`
+- `test_playground_lease_repair_key_issues_timeline_and_gaps_are_fact_specific`
+- `test_playground_lease_repair_next_steps_preview_and_exports_are_scoped`
+- Extended `test_playground_diagnosis_runs_do_not_cross_contaminate_issue_templates` to run the lease fixture after force majeure, SaaS/SLA, refund, and confidentiality/IP fixtures.
+
+### 11. Commands run
+
+| Command | Result | Summary |
+| --- | --- | --- |
+| `Test-Path package.json` | Passed | Returned `False`; no npm package file exists, so npm install/test/build/lint/typecheck scripts are not applicable. |
+| `git diff --check` | Passed | No whitespace errors in the patch. |
+| `node --check docs\assets\app.js` | Blocked by approval timeout | Attempted more than once; the automatic permission approval review did not finish before its deadline. |
+| `python -m pytest tests\test_docs_site.py -q` | Blocked by approval timeout | Attempted; the automatic permission approval review did not finish before its deadline. |
+| `python -m pytest` | Blocked by approval timeout | Attempted; the automatic permission approval review did not finish before its deadline. |
+| `python -m compileall -q contract2agent tests scripts` | Blocked by approval timeout | Attempted; the automatic permission approval review did not finish before its deadline. |
+| `python scripts\check_docs_links.py` | Blocked by approval timeout | Attempted; the automatic permission approval review did not finish before its deadline. |
+| `python -m mkdocs build --strict` | Blocked by approval timeout | Attempted; the automatic permission approval review did not finish before its deadline. |
+
+### 12. Build/test results
+
+- `git diff --check` passed.
+- The repository has no `package.json`, so npm commands are not present.
+- Node, pytest, compileall, docs-link, and MkDocs verification could not be executed in this session because executable commands requiring escalation timed out in the approval reviewer.
+- The static playground route remains `docs/playground/index.html`, preserving the GitHub Pages `/Contract2Agent/playground/` path. No backend, runtime network call, route, sample loading, export button, copy button, styling, navigation, or unrelated UI change was added.
+
+### 13. Remaining limitations
+
+- The playground remains a deterministic static analyzer. It now has lease-specific trigger gates and blockers, but still depends on explicit textual signals.
+- Exact business-day date arithmetic is still described as evidence-dependent rather than computed.
+- Full executable verification should be rerun in an environment where `node`, `pytest`, `compileall`, `check_docs_links.py`, and `mkdocs build --strict` are approved.
+
 ## 2026-05-04 Confidentiality / IP Indemnity Trigger-Gate Follow-Up
 
 ### 1. What was wrong

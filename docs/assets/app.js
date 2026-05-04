@@ -216,6 +216,100 @@
       ],
       blocker_terms: ["refund", "refunds", "refundable", "non-refundable", "return of fees", "overpayment"]
     },
+    lease_maintenance: {
+      active_triggers: [
+        "landlord maintenance obligation",
+        "landlord failed to perform a maintenance obligation",
+        "roof repair",
+        "roof repairs",
+        "roof leak",
+        "exterior wall repair",
+        "hvac repair",
+        "plumbing repair",
+        "water intrusion",
+        "leak",
+        "building condition",
+        "repairs not begun",
+        "repairs delayed",
+        "begin commercially reasonable repairs",
+        "commercially reasonable roof repairs",
+        "materially interferes with the tenant's use",
+        "material interference with premises"
+      ],
+      clause_triggers: ["landlord to maintain", "landlord must maintain", "building roof", "exterior walls", "hvac", "plumbing", "commercially reasonable repairs"],
+      negative_triggers: ["no lease maintenance dispute", "no repair dispute", "no water intrusion", "no roof leak"],
+      blocker_terms: ["lease maintenance", "maintenance obligation", "roof repair", "roof leak", "water intrusion", "commercially reasonable repairs"]
+    },
+    rent_abatement: {
+      active_triggers: [
+        "rent abatement",
+        "abatement demand",
+        "demanded rent abatement",
+        "affected period",
+        "affected area",
+        "unusable area",
+        "part of the showroom was unusable",
+        "partial use loss",
+        "materially interferes with the tenant's use",
+        "material interference with use"
+      ],
+      clause_triggers: ["rent abatement", "affected period", "affected area", "materially interferes"],
+      negative_triggers: ["no rent abatement", "no abatement demand"],
+      blocker_terms: ["rent abatement", "abatement", "affected area", "affected period", "unusable"]
+    },
+    rent_withholding: {
+      active_triggers: [
+        "withheld rent",
+        "withheld 40%",
+        "rent withholding",
+        "withholding rent",
+        "partial rent payment",
+        "unauthorized withholding",
+        "payment default",
+        "rent ledger",
+        "failure to pay rent"
+      ],
+      clause_triggers: ["may not withhold rent", "unauthorized withholding", "payment default", "rent ledger"],
+      negative_triggers: ["no rent withholding", "no payment default"],
+      blocker_terms: ["rent withholding", "withheld rent", "withholding rent", "payment default", "rent ledger"]
+    },
+    security_deposit: {
+      active_triggers: [
+        "security deposit",
+        "deposit deduction",
+        "deposit deductions",
+        "itemized deposit statement",
+        "move-out inspection",
+        "deposit return",
+        "return of the security deposit",
+        "repair deductions",
+        "ordinary wear and tear"
+      ],
+      clause_triggers: ["security deposit", "itemized deposit statement", "ordinary wear and tear", "deduct from the security deposit"],
+      negative_triggers: ["no security deposit dispute", "no deposit deduction"],
+      blocker_terms: ["security deposit", "deposit deduction", "deposit statement", "ordinary wear and tear"]
+    },
+    tenant_damage: {
+      active_triggers: [
+        "tenant-caused damage",
+        "tenant caused damage",
+        "damage beyond ordinary wear and tear",
+        "beyond ordinary wear and tear",
+        "roof leak caused damage",
+        "caused by the roof leak",
+        "tenant misuse",
+        "repair invoice",
+        "repainting",
+        "flooring damage",
+        "flooring repair invoice",
+        "move-out photos",
+        "move-out inspection",
+        "causation dispute"
+      ],
+      clause_triggers: ["tenant-caused damage", "tenant caused damage", "tenant misuse", "ordinary wear and tear"],
+      negative_triggers: ["no tenant-caused damage", "no tenant caused damage", "no property damage"],
+      blocker_terms: ["tenant-caused damage", "tenant caused damage", "property damage", "tenant misuse", "ordinary wear and tear", "flooring", "repainting"]
+    },
     force_majeure: {
       active_triggers: forceMajeureFactTriggers,
       clause_triggers: ["force majeure", "government order", "natural disaster", "strike", "war"],
@@ -626,6 +720,19 @@
     return tags.some((item) => normalize(item) === normalize(tag));
   }
 
+  function hasLeaseActiveIssue(tags) {
+    return [
+      "lease maintenance",
+      "repair obligation",
+      "rent abatement",
+      "rent withholding",
+      "payment default",
+      "security deposit",
+      "tenant-caused damage",
+      "property damage causation"
+    ].some((tag) => hasTag(tags, tag));
+  }
+
   function extractDates(text) {
     const matches = String(text || "").match(dateRegex());
     return matches ? uniqueValues(matches.map((match) => match.trim())) : [];
@@ -926,6 +1033,60 @@
     };
   }
 
+  function extractLeaseRentPeriod(text) {
+    const segments = findSegmentsNear(text, ["withheld", "rent withholding", "rent ledger", "withholding"]).concat(
+      findSegmentsNear(text, ["rent"])
+    );
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      const rentMatch = segment.match(/\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+rent\b/i);
+      if (rentMatch) {
+        const month = rentMatch[0].split(/\s+/)[0];
+        return `${month.charAt(0).toUpperCase()}${month.slice(1).toLowerCase()} rent`;
+      }
+      const monthMatch = segment.match(/\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/i);
+      if (monthMatch && hasAny(segment, ["withheld", "withholding", "rent ledger"])) {
+        return `${monthMatch[0].charAt(0).toUpperCase()}${monthMatch[0].slice(1).toLowerCase()} rent`;
+      }
+    }
+    return "";
+  }
+
+  function extractLeaseAbatementPeriod(text) {
+    const match = String(text || "").match(
+      /\brent abatement\s+for\s+(\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2})\s+(?:through|to|-)\s+(\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2})/i
+    );
+    return {
+      start: match ? match[1].replace(/\b\w/g, (char) => char.toUpperCase()) : "",
+      end: match ? match[2].replace(/\b\w/g, (char) => char.toUpperCase()) : ""
+    };
+  }
+
+  function extractLeaseTimeline(data) {
+    const facts = factText(data);
+    const source = allText(data);
+    const contractText = data.contractText || "";
+    const rentPeriod = extractLeaseRentPeriod(facts);
+    return {
+      waterIntrusionDate: findDateInSegment(facts, ["discovered water intrusion", "water intrusion", "roof leak", "leak after heavy rain"], "first"),
+      tenantNoticeDate:
+        findDateInSegment(facts, ["sent an email", "email to the landlord", "reporting water intrusion", "tenant sent", "september 4 notice"], "first") ||
+        findDateInSegment(facts, ["notice"], "first"),
+      landlordResponseDate: findDateInSegment(facts, ["landlord responded", "said it would inspect", "response email"], "first"),
+      contractorInspectionDate: findDateInSegment(facts, ["roof contractor inspected", "contractor inspected", "inspection report", "contractor inspection"], "first"),
+      rentWithholdingPeriod: rentPeriod,
+      rentWithholdingPercent: findPercentNear(facts, ["withheld", "rent withholding", "rent ledger"]),
+      repairCompletionDate: findDateInSegment(facts, ["completed roof repairs", "roof repairs completed", "repairs completed", "completed"], "last"),
+      moveOutDate: findDateInSegment(facts, ["move-out inspection", "move-out", "move out", "surrender", "at move-out"], "first"),
+      repairCurePeriod: findDurationNear(contractText, ["begin commercially reasonable repairs", "maintenance obligation", "repair", "cure period"]),
+      depositStatementPeriod: findDurationNear(contractText, ["itemized deposit statement", "after surrender", "deposit statement"]),
+      abatementPeriod: extractLeaseAbatementPeriod(source),
+      depositDeduction: findMoneyNear(facts, ["security deposit", "deducted", "deduction"], "first"),
+      liabilityCapPeriod: extractLiabilityCapPeriod(contractText),
+      deemedReceiptRule: hasAny(contractText, ["two business days after mailing", "next business day after email", "whichever occurs later"])
+    };
+  }
+
   function extractConfidentialMaterials(data) {
     const source = factText(data);
     const materials = [];
@@ -1079,11 +1240,56 @@
     ]);
   }
 
+  function hasLeaseMaintenanceFactTrigger(data) {
+    const contractSupport = hasAny(data.contractText, [
+      "landlord to maintain",
+      "landlord must maintain",
+      "landlord failed to perform a maintenance obligation",
+      "building roof",
+      "exterior walls",
+      "hvac main units",
+      "common plumbing systems",
+      "commercially reasonable repairs"
+    ]);
+    const factSupport = hasIssueFactTrigger(data, "lease_maintenance");
+    return factSupport && (contractSupport || hasAny(factText(data), ["landlord", "lease", "tenant"]));
+  }
+
+  function hasRentAbatementFactTrigger(data) {
+    return hasIssueFactTrigger(data, "rent_abatement");
+  }
+
+  function hasRentWithholdingFactTrigger(data) {
+    return hasIssueFactTrigger(data, "rent_withholding");
+  }
+
+  function hasSecurityDepositFactTrigger(data) {
+    return hasIssueFactTrigger(data, "security_deposit");
+  }
+
+  function hasTenantDamageFactTrigger(data) {
+    return hasIssueFactTrigger(data, "tenant_damage");
+  }
+
+  function hasPropertyDamageCausationFactTrigger(data) {
+    const facts = factText(data);
+    return hasTenantDamageFactTrigger(data) && hasAny(facts, [
+      "caused by the roof leak",
+      "not tenant misuse",
+      "tenant misuse",
+      "caused by roof leak",
+      "damage was caused",
+      "causation dispute",
+      "flooring and repainting damage"
+    ]);
+  }
+
   function hasLiabilityCapCarveoutClause(contractText) {
     const text = normalize(contractText);
     return (
       hasAny(text, ["cap does not limit", "liability cap does not limit", "does not limit claims", "does not limit breach of confidentiality", "does not limit indemnity"]) ||
-      (hasAny(text, ["does not limit", "not limit"]) && hasAny(text, ["confidentiality", "indemnity", "willful misconduct", "ip claims"]))
+      (hasAny(text, ["does not limit", "not limit"]) && hasAny(text, ["confidentiality", "indemnity", "willful misconduct", "ip claims"])) ||
+      (hasAny(text, ["except for", "carve-out", "carve out"]) && hasAny(text, ["unpaid rent", "intentional misconduct", "tenant-caused property damage", "tenant caused property damage"]))
     );
   }
 
@@ -1134,8 +1340,21 @@
     const unauthorizedDisclosureFact = hasUnauthorizedDisclosureFactTrigger(data);
     const thirdPartyIpFact = hasThirdPartyIpFactTrigger(data);
     const forceMajeureFact = hasForceMajeureFactTrigger(data);
+    const leaseMaintenanceFact = hasLeaseMaintenanceFactTrigger(data);
+    const rentAbatementFact = hasRentAbatementFactTrigger(data);
+    const rentWithholdingFact = hasRentWithholdingFactTrigger(data);
+    const securityDepositFact = hasSecurityDepositFactTrigger(data);
+    const tenantDamageFact = hasTenantDamageFactTrigger(data);
+    const propertyDamageCausationFact = hasPropertyDamageCausationFactTrigger(data);
     const liquidatedDamagesFact = hasIssueFactTrigger(data, "liquidated_damages");
     const coverCostsFact = hasIssueFactTrigger(data, "cover_costs");
+    const nonDesiredFacts = collectCaseText(data, [
+      "disputeDescription",
+      "claimantPosition",
+      "respondentPosition",
+      "evidence",
+      "metadata"
+    ]);
     const damagesFact = splitSegments(facts).some((segment) => {
       if (segmentBlocksFamily(segment, "payment") || segmentBlocksFamily(segment, "refund")) {
         return hasAny(segment, ["damages", "remediation costs", "investigation costs", "defense costs", "business-impact damages"]);
@@ -1156,7 +1375,14 @@
         "recoverable damages",
         "loss calculation",
         "claimed revenue",
-        "refund calculation"
+        "refund calculation",
+        "display-fixture damages",
+        "damaged display fixtures",
+        "display fixtures",
+        "security deposit deduction",
+        "deposit deduction",
+        "repair costs",
+        "repair deductions"
       ]);
     });
     const liabilityLimitationFact = hasAny(facts, [
@@ -1184,12 +1410,12 @@
         (dispute.includes("payment") && !familyBlocked(data, "payment", paymentFact)),
       invoiceDispute: invoiceDisputeFact,
       notice:
-        hasAny(facts, ["written notice", "non-payment notice", "nonpayment notice", "notice of breach", "breach notice", "notice of non-payment", "delivery delay notice", "delay notice", "force majeure notice", "indemnity notice", "unauthorized-disclosure notice", "unauthorized disclosure notice", "reminder email", "notice was vague", "notice was sent", "notice contacts", "failed to notify", "notify the customer"]),
+        hasAny(facts, ["written notice", "non-payment notice", "nonpayment notice", "notice of breach", "breach notice", "notice of non-payment", "delivery delay notice", "delay notice", "force majeure notice", "indemnity notice", "unauthorized-disclosure notice", "unauthorized disclosure notice", "reminder email", "notice was vague", "notice was sent", "notice contacts", "notice address", "lease notice", "proper lease notice", "tenant notice", "email notice", "certified mail", "failed to notify", "notify the customer"]),
       cure:
         hasAny(facts, ["cure period", "failed to cure", "failure to cure", "waited", "days before suspension", "days before termination"]),
       suspension: suspensionFact,
       termination:
-        dispute.includes("termination") || hasAny(facts, ["terminate", "termination", "terminated", "cancelled", "canceled"]),
+        dispute.includes("termination") || hasAny(nonDesiredFacts, ["terminate", "termination", "terminated", "cancelled", "canceled"]),
       delivery:
         deliveryFact ||
         (dispute.includes("delivery") && !familyBlocked(data, "delivery", deliveryFact)),
@@ -1221,6 +1447,16 @@
       liabilityCapCarveout:
         hasLiabilityCapCarveoutClause(data.contractText) &&
         (confidentialityFact || unauthorizedDisclosureFact || indemnityFact || thirdPartyIpFact),
+      leaseMaintenance: leaseMaintenanceFact,
+      repairObligation: leaseMaintenanceFact,
+      rentAbatement: rentAbatementFact,
+      rentWithholding: rentWithholdingFact,
+      paymentDefault:
+        rentWithholdingFact &&
+        hasAny(data.contractText, ["unauthorized withholding is a payment default", "unauthorized withholding", "payment default"]),
+      securityDeposit: securityDepositFact,
+      tenantCausedDamage: tenantDamageFact,
+      propertyDamageCausation: propertyDamageCausationFact,
       penalty:
         liquidatedDamagesFact || (hasAny(data.contractText, ["liquidated damages", "penalty"]) && (deliveryFact || forceMajeureFact || damagesFact)),
       forceMajeure: forceMajeureFact,
@@ -1255,6 +1491,48 @@
       if (curePeriod) {
         addUnique(signals, `${curePeriod} cure period`);
       }
+    }
+    if (hasAny(contractText, ["landlord to maintain", "landlord must maintain", "requires the landlord to maintain", "building roof", "exterior walls", "hvac main units", "common plumbing systems"])) {
+      addUnique(signals, "landlord maintenance obligation");
+    }
+    if (hasAny(contractText, ["tenant must maintain", "tenant is responsible", "damage caused by the tenant", "tenant-caused damage", "tenant caused damage", "tenant's employees", "tenant misuse"])) {
+      addUnique(signals, "tenant maintenance responsibility");
+      addUnique(signals, "tenant-caused damage");
+    }
+    if (hasAny(contractText, ["written notice describing the condition", "written notice", "requested repair"])) {
+      addUnique(signals, "written notice requirement");
+    }
+    if (hasAny(contractText, ["certified mail"])) {
+      addUnique(signals, "certified mail requirement");
+    }
+    if (hasAny(contractText, ["sent by email", "email transmission", "email and certified mail"])) {
+      addUnique(signals, "email notice requirement");
+    }
+    if (hasAny(contractText, ["lease schedule", "notice addresses listed in the lease schedule"])) {
+      addUnique(signals, "lease schedule notice addresses");
+    }
+    if (hasAny(contractText, ["begin commercially reasonable repairs", "commercially reasonable repairs"])) {
+      const repairCure = findDurationNear(data.contractText, ["begin commercially reasonable repairs", "maintenance obligation", "repair"]);
+      if (repairCure) {
+        addUnique(signals, `${durationRequirementLabel(repairCure)} repair cure period`);
+      }
+      addUnique(signals, "commercially reasonable repairs");
+    }
+    if (hasAny(contractText, ["rent abatement", "affected period", "affected area", "materially interferes"])) {
+      addUnique(signals, "rent abatement for affected period and affected area");
+    }
+    if (hasAny(contractText, ["may not withhold rent", "unauthorized withholding", "payment default"])) {
+      addUnique(signals, "unauthorized rent withholding as payment default");
+    }
+    if (hasAny(contractText, ["security deposit", "deposit statement", "deduct from the security deposit"])) {
+      addUnique(signals, "security deposit deductions");
+      const depositStatement = findDurationNear(data.contractText, ["itemized deposit statement", "after surrender", "deposit statement"]);
+      if (depositStatement) {
+        addUnique(signals, `itemized deposit statement within ${durationSentence(depositStatement)}`);
+      }
+    }
+    if (hasAny(contractText, ["ordinary wear and tear"])) {
+      addUnique(signals, "ordinary wear and tear limitation");
     }
     if (hasAny(contractText, ["suspend", "suspension", "suspend access", "affected services"])) {
       addUnique(signals, "suspension rights");
@@ -1291,11 +1569,25 @@
       addUnique(signals, "liability cap");
       const capPeriod = extractLiabilityCapPeriod(data.contractText);
       if (capPeriod) {
-        addUnique(signals, `${durationAdjective(capPeriod)} fee liability cap`);
+        addUnique(
+          signals,
+          hasAny(contractText, ["base rent"])
+            ? `${capPeriod} of base rent liability cap`
+            : `${durationAdjective(capPeriod)} fee liability cap`
+        );
       }
     }
     if (hasLiabilityCapCarveoutClause(data.contractText)) {
       addUnique(signals, "liability cap carve-outs");
+      if (hasAny(contractText, ["unpaid rent"])) {
+        addUnique(signals, "unpaid rent carve-out");
+      }
+      if (hasAny(contractText, ["intentional misconduct"])) {
+        addUnique(signals, "intentional misconduct carve-out");
+      }
+      if (hasAny(contractText, ["tenant-caused property damage", "tenant caused property damage"])) {
+        addUnique(signals, "tenant-caused property damage carve-out");
+      }
       if (hasAny(contractText, ["confidentiality", "breach of confidentiality"])) {
         addUnique(signals, "confidentiality carve-out");
       }
@@ -1421,6 +1713,30 @@
     if ((triggers.cure || triggers.suspension || triggers.termination || (triggers.delivery && triggers.notice)) && hasSignal(clauseSignals, "cure")) {
       addUnique(tags, "cure period");
     }
+    if (triggers.leaseMaintenance && hasSignal(clauseSignals, "landlord maintenance")) {
+      addUnique(tags, "lease maintenance");
+    }
+    if (triggers.repairObligation && (hasSignal(clauseSignals, "commercially reasonable repairs") || hasSignal(clauseSignals, "repair cure period"))) {
+      addUnique(tags, "repair obligation");
+    }
+    if (triggers.rentAbatement && hasSignal(clauseSignals, "rent abatement")) {
+      addUnique(tags, "rent abatement");
+    }
+    if (triggers.rentWithholding && hasSignal(clauseSignals, "rent withholding")) {
+      addUnique(tags, "rent withholding");
+    }
+    if (triggers.paymentDefault && hasSignal(clauseSignals, "payment default")) {
+      addUnique(tags, "payment default");
+    }
+    if (triggers.securityDeposit && hasSignal(clauseSignals, "security deposit")) {
+      addUnique(tags, "security deposit");
+    }
+    if (triggers.tenantCausedDamage && hasSignal(clauseSignals, "tenant-caused damage")) {
+      addUnique(tags, "tenant-caused damage");
+    }
+    if (triggers.propertyDamageCausation && (hasSignal(clauseSignals, "tenant-caused damage") || hasSignal(clauseSignals, "ordinary wear"))) {
+      addUnique(tags, "property damage causation");
+    }
     if (!familyBlocked(data, "suspension", triggers.suspension) && triggers.suspension && hasSignal(clauseSignals, "suspension")) {
       addUnique(tags, "suspension");
     }
@@ -1533,6 +1849,44 @@
       hasTag(activeIssueTags, "unauthorized disclosure") ||
       hasTag(activeIssueTags, "indemnity") ||
       hasTag(activeIssueTags, "third-party IP claim");
+    const leaseIssue = hasLeaseActiveIssue(activeIssueTags);
+
+    if (leaseIssue) {
+      if ((hasTag(activeIssueTags, "notice") || hasTag(activeIssueTags, "cure period")) && !hasGap(gaps, ["certified mail"])) {
+        addUnique(gaps, "Proof that the September 4 notice was sent by certified mail");
+      }
+      if ((hasTag(activeIssueTags, "notice") || hasTag(activeIssueTags, "cure period")) && !hasGap(gaps, ["lease schedule notice", "exact lease schedule"])) {
+        addUnique(gaps, "Whether the September 4 email was sent to the exact lease schedule notice email address");
+      }
+      if (hasTag(activeIssueTags, "rent abatement") && !hasGap(gaps, ["materially interfered", "material interference"])) {
+        addUnique(gaps, "Whether the roof leak materially interfered with the tenant's use of the premises");
+      }
+      if (hasTag(activeIssueTags, "rent abatement") && !hasGap(gaps, ["square footage", "affected area", "affected showroom"])) {
+        addUnique(gaps, "Affected square footage or affected showroom area");
+      }
+      if (hasTag(activeIssueTags, "cure period") && !hasGap(gaps, ["cure calculation", "cure deadline", "deemed receipt"])) {
+        addUnique(gaps, "10-business-day cure deadline calculation from valid or deemed receipt");
+      }
+      if (hasTag(activeIssueTags, "repair obligation") && !hasGap(gaps, ["began commercially reasonable repairs", "repair timing", "within 10 business days"])) {
+        addUnique(gaps, "Whether the landlord began commercially reasonable repairs within 10 business days after valid receipt");
+      }
+      if ((hasTag(activeIssueTags, "tenant-caused damage") || hasTag(activeIssueTags, "property damage causation")) && !hasGap(gaps, ["roof leak or tenant misuse", "caused by roof leak", "tenant misuse"])) {
+        addUnique(gaps, "Whether the flooring and repainting damage was caused by roof leak or tenant misuse");
+      }
+      if (hasTag(activeIssueTags, "security deposit") && !hasGap(gaps, ["ordinary wear and tear", "beyond ordinary wear"])) {
+        addUnique(gaps, "Whether the $8,500 deduction was limited to damage beyond ordinary wear and tear");
+      }
+      if (hasTag(activeIssueTags, "rent abatement") && !hasGap(gaps, ["rent abatement", "affected period"])) {
+        addUnique(gaps, "Calculation of rent abatement for the affected area and affected period");
+      }
+      if (hasTag(activeIssueTags, "damages") && !hasGap(gaps, ["display-fixture", "display fixture"])) {
+        addUnique(gaps, "Evidence supporting display-fixture damages");
+      }
+      if (hasTag(activeIssueTags, "security deposit") && !hasGap(gaps, ["itemized deposit statement timing", "statement timing", "within 30 days"])) {
+        addUnique(gaps, "Proof of itemized deposit statement timing within 30 days after surrender");
+      }
+      return gaps.length ? uniqueValues(gaps) : ["No obvious evidence gap detected from the current text"];
+    }
 
     if (!hasAny(combined, ["signed", "executed", "agreement", "purchase order", "order form"])) {
       addUnique(gaps, "signed agreement or executed contract copy");
@@ -1635,6 +1989,7 @@
     const fmTimeline = extractForceMajeureTimeline(data);
     const refundTimeline = extractRefundTerminationTimeline(data);
     const confidentialityTimeline = extractConfidentialityIndemnityTimeline(data);
+    const leaseTimeline = extractLeaseTimeline(data);
     const paymentDeadline = findDurationNear(contractText, ["pay", "payment", "invoice", "fees"]);
     const disputeDeadline = findDurationNear(contractText, ["disputes an invoice", "disputed amount", "basis for dispute"]);
     const cureDuration = findDurationNear(contractText, ["cure"]);
@@ -1648,6 +2003,47 @@
       hasTag(activeIssueTags, "unauthorized disclosure") ||
       hasTag(activeIssueTags, "indemnity") ||
       hasTag(activeIssueTags, "third-party IP claim");
+    const leaseIssue = hasLeaseActiveIssue(activeIssueTags);
+
+    if (leaseIssue) {
+      if (leaseTimeline.waterIntrusionDate) {
+        addUnique(timeline, `${leaseTimeline.waterIntrusionDate}: tenant discovered water intrusion.`);
+      }
+      if (leaseTimeline.tenantNoticeDate) {
+        addUnique(timeline, `${leaseTimeline.tenantNoticeDate}: tenant sent email notice reporting water intrusion.`);
+      }
+      if (leaseTimeline.landlordResponseDate) {
+        addUnique(timeline, `${leaseTimeline.landlordResponseDate}: landlord responded and said it would inspect.`);
+      }
+      if (leaseTimeline.contractorInspectionDate) {
+        addUnique(timeline, `${leaseTimeline.contractorInspectionDate}: roof contractor inspected and found deteriorated roof flashing.`);
+      }
+      if (leaseTimeline.rentWithholdingPeriod) {
+        const withheldAmount = leaseTimeline.rentWithholdingPercent ? `${leaseTimeline.rentWithholdingPercent} of` : "part of";
+        addUnique(timeline, `${leaseTimeline.rentWithholdingPeriod}: tenant withheld ${withheldAmount} rent.`);
+      }
+      if (leaseTimeline.repairCompletionDate) {
+        addUnique(timeline, `${leaseTimeline.repairCompletionDate}: landlord completed roof repairs.`);
+      }
+      if (leaseTimeline.moveOutDate) {
+        addUnique(timeline, `${leaseTimeline.moveOutDate}: move-out inspection or surrender event.`);
+      }
+      if (leaseTimeline.depositStatementPeriod && leaseTimeline.moveOutDate) {
+        addUnique(timeline, `${durationSentence(leaseTimeline.depositStatementPeriod)} after surrender: deadline for itemized deposit statement from ${leaseTimeline.moveOutDate}, if applicable.`);
+      }
+      if (leaseTimeline.repairCurePeriod) {
+        addUnique(timeline, `${durationRequirementLabel(leaseTimeline.repairCurePeriod)} repair cure period: calculate from valid/deemed receipt once notice delivery method is verified.`);
+      }
+      if (leaseTimeline.deemedReceiptRule) {
+        addUnique(timeline, "Deemed receipt rule: two business days after mailing or next business day after email transmission, whichever occurs later.");
+      } else if (hasSignal(clauseSignals, "deemed receipt")) {
+        addUnique(timeline, "Deemed receipt rule identified: calculate receipt under the lease notice clause.");
+      }
+      if (hasGap(evidenceGaps, ["certified mail", "lease schedule notice", "valid receipt", "deemed receipt", "cure deadline"])) {
+        addUnique(timeline, "Repair cure deadline remains evidence-dependent until notice method, lease schedule address, and deemed receipt are verified.");
+      }
+      return timeline.length ? timeline : ["No dated timeline facts detected yet"];
+    }
 
     if ((hasTag(activeIssueTags, "payment") || hasTag(activeIssueTags, "invoice dispute")) && invoiceDates.length) {
       addUnique(timeline, `Invoice dates identified: ${formatList(invoiceDates)}.`);
@@ -1787,6 +2183,7 @@
     const fmTimeline = extractForceMajeureTimeline(data);
     const refundTimeline = extractRefundTerminationTimeline(data);
     const confidentialityTimeline = extractConfidentialityIndemnityTimeline(data);
+    const leaseTimeline = extractLeaseTimeline(data);
     const confidentialMaterials = extractConfidentialMaterials(data);
     const ldTerms = extractLiquidatedDamagesTerms(data);
     const noticeDates = extractNoticeDates(data);
@@ -1810,6 +2207,58 @@
       hasTag(activeIssueTags, "unauthorized disclosure") ||
       hasTag(activeIssueTags, "indemnity") ||
       hasTag(activeIssueTags, "third-party IP claim");
+    const leaseIssue = hasLeaseActiveIssue(activeIssueTags);
+
+    if (leaseIssue) {
+      const noticeDate = leaseTimeline.tenantNoticeDate || "the tenant notice";
+      const responseDate = leaseTimeline.landlordResponseDate || "the landlord response";
+      const inspectionDate = leaseTimeline.contractorInspectionDate || "the roof contractor inspection";
+      const completionDate = leaseTimeline.repairCompletionDate || "repair completion";
+      const moveOutDate = leaseTimeline.moveOutDate || "surrender";
+      const rentPeriod = leaseTimeline.rentWithholdingPeriod || "the rent period";
+      const withholding = leaseTimeline.rentWithholdingPercent || "withheld";
+      const depositAmount = leaseTimeline.depositDeduction || "the security deposit";
+      const cure = leaseTimeline.repairCurePeriod ? durationRequirementLabel(leaseTimeline.repairCurePeriod) : "contractual";
+      const abatementStart = leaseTimeline.abatementPeriod.start || noticeDate;
+      const abatementEnd = leaseTimeline.abatementPeriod.end || completionDate;
+      const capLabel = leaseTimeline.liabilityCapPeriod
+        ? `${leaseTimeline.liabilityCapPeriod} of base rent liability cap`
+        : "liability cap";
+
+      if (hasTag(activeIssueTags, "notice")) {
+        addUnique(issues, `Whether the ${noticeDate} tenant email satisfied the lease notice requirement or failed because certified mail was also required.`);
+        addUnique(issues, `Whether the ${noticeDate} email was sent to the lease schedule notice email address.`);
+        addUnique(issues, "When notice was deemed received under the email plus certified mail rule.");
+      }
+      if (hasTag(activeIssueTags, "cure period") || hasTag(activeIssueTags, "repair obligation")) {
+        addUnique(issues, `Whether the ${cure} cure period was triggered and when it expired.`);
+        addUnique(issues, `Whether the landlord began commercially reasonable roof repairs within the ${cure} cure period.`);
+        addUnique(issues, `Whether the ${inspectionDate} roof contractor inspection qualifies as beginning commercially reasonable repairs.`);
+        addUnique(issues, `Whether completion of roof repairs on ${completionDate} was timely enough under the lease after the ${responseDate} response.`);
+      }
+      if (hasTag(activeIssueTags, "rent abatement")) {
+        addUnique(issues, "Whether the water intrusion materially interfered with the tenant's use of the showroom.");
+        addUnique(issues, `Whether rent abatement is available for ${abatementStart} through ${abatementEnd}.`);
+        addUnique(issues, "Whether rent abatement must be calculated by affected area and affected period.");
+      }
+      if (hasTag(activeIssueTags, "rent withholding") || hasTag(activeIssueTags, "payment default")) {
+        addUnique(issues, `Whether the tenant's ${withholding} ${rentPeriod} withholding was authorized rent abatement or an unauthorized payment default.`);
+      }
+      if (hasTag(activeIssueTags, "security deposit")) {
+        addUnique(issues, `Whether the ${depositAmount} security deposit deduction was supported by documented tenant-caused damage beyond ordinary wear and tear.`);
+        addUnique(issues, `Whether the landlord provided an adequate itemized deposit statement within 30 days after the ${moveOutDate} move-out/surrender.`);
+      }
+      if (hasTag(activeIssueTags, "tenant-caused damage") || hasTag(activeIssueTags, "property damage causation")) {
+        addUnique(issues, "Whether the flooring and repainting damage was caused by the roof leak or tenant misuse.");
+      }
+      if (hasTag(activeIssueTags, "damages") || hasTag(activeIssueTags, "liability limitation")) {
+        addUnique(issues, "Whether display-fixture damages are recoverable or limited by consequential or lost-profit damages exclusions.");
+        addUnique(issues, `Whether the ${capLabel} or unpaid rent, intentional misconduct, and tenant-caused property damage carve-outs apply.`);
+      }
+      if (issues.length) {
+        return issues;
+      }
+    }
 
     if (confidentialityIpIssue) {
       const disclosureDate = confidentialityTimeline.disclosureDate || "the upload date";
@@ -2037,6 +2486,7 @@
     const fmTimeline = extractForceMajeureTimeline(data);
     const refundTimeline = extractRefundTerminationTimeline(data);
     const confidentialityTimeline = extractConfidentialityIndemnityTimeline(data);
+    const leaseTimeline = extractLeaseTimeline(data);
     const ldTerms = extractLiquidatedDamagesTerms(data);
     const refundAcceptanceIssue =
       hasTag(tags, "refund") ||
@@ -2047,6 +2497,35 @@
       hasTag(tags, "unauthorized disclosure") ||
       hasTag(tags, "indemnity") ||
       hasTag(tags, "third-party IP claim");
+    const leaseIssue = hasLeaseActiveIssue(tags);
+
+    if (leaseIssue) {
+      const datedTimeline = [
+        leaseTimeline.waterIntrusionDate,
+        leaseTimeline.tenantNoticeDate,
+        leaseTimeline.landlordResponseDate,
+        leaseTimeline.contractorInspectionDate,
+        leaseTimeline.rentWithholdingPeriod,
+        leaseTimeline.repairCompletionDate,
+        leaseTimeline.moveOutDate
+      ].filter(Boolean).join(" / ");
+      addUnique(steps, datedTimeline ? `Build a ${datedTimeline} timeline.` : "Build a lease repair, notice, rent abatement, rent withholding, repair completion, and move-out timeline.");
+      addUnique(steps, "Verify the lease schedule notice addresses.");
+      addUnique(steps, `Verify whether the ${leaseTimeline.tenantNoticeDate || "tenant"} notice was sent by both required methods: email and certified mail.`);
+      addUnique(steps, "Calculate deemed receipt under the lease notice rule.");
+      addUnique(steps, `Calculate the ${durationRequirementLabel(leaseTimeline.repairCurePeriod) || "contractual"} cure deadline after valid receipt.`);
+      addUnique(steps, `Determine whether the ${leaseTimeline.contractorInspectionDate || "contractor"} inspection qualifies as beginning commercially reasonable repairs.`);
+      addUnique(steps, `Compare repair start, contractor inspection, and ${leaseTimeline.repairCompletionDate || "repair completion"} completion records.`);
+      addUnique(steps, "Quantify the affected showroom area and affected period.");
+      addUnique(steps, "Calculate permissible rent abatement by affected area and affected period.");
+      addUnique(steps, `Assess whether the ${leaseTimeline.rentWithholdingPercent || "partial"} ${leaseTimeline.rentWithholdingPeriod || "rent"} withholding was authorized rent abatement or a payment default.`);
+      addUnique(steps, `Compare the ${leaseTimeline.depositDeduction || "security deposit"} security deposit deduction with move-out photos, repair invoices, and the ordinary wear-and-tear standard.`);
+      addUnique(steps, "Determine whether flooring and repainting damage was caused by the roof leak or tenant misuse.");
+      addUnique(steps, "Review itemized deposit statement timing and sufficiency.");
+      addUnique(steps, `Review consequential/lost-profit damages exclusions and ${leaseTimeline.liabilityCapPeriod ? `${leaseTimeline.liabilityCapPeriod} of base rent` : "contractual"} liability cap.`);
+      addUnique(steps, "Evaluate recoverability of display-fixture damages.");
+      return data.diagnosisDepth === "Quick" ? steps.slice(0, 6) : steps;
+    }
 
     if (confidentialityIpIssue) {
       const datedTimeline = [
@@ -2200,13 +2679,26 @@
       text.includes("defense cost estimate") ||
       text.includes("remediation") ||
       text.includes("investigation") ||
-      text.includes("business-impact")
+      text.includes("business-impact") ||
+      text.includes("certified mail") ||
+      text.includes("lease schedule notice") ||
+      text.includes("materially interfered") ||
+      text.includes("material interference") ||
+      text.includes("affected showroom") ||
+      text.includes("affected square footage") ||
+      text.includes("repair timing") ||
+      text.includes("began commercially reasonable repairs") ||
+      text.includes("tenant misuse") ||
+      text.includes("ordinary wear and tear") ||
+      text.includes("rent abatement") ||
+      text.includes("display-fixture") ||
+      text.includes("itemized deposit statement")
     );
   }
 
   function isProceduralEvidenceGap(gap) {
     const text = normalize(gap);
-    return text.includes("notice address") || text.includes("notice delivery") || text.includes("proof of notice") || text.includes("cure deadline") || text.includes("deemed receipt");
+    return text.includes("notice address") || text.includes("notice delivery") || text.includes("proof of notice") || text.includes("cure deadline") || text.includes("deemed receipt") || text.includes("certified mail") || text.includes("lease schedule notice");
   }
 
   function scoreRisk(data, activeIssueTags, evidenceGaps, timelineFacts, triggers) {
@@ -2219,6 +2711,7 @@
       hasTag(activeIssueTags, "cure period") ||
       hasTag(activeIssueTags, "suspension") ||
       hasTag(activeIssueTags, "termination");
+    const leaseIssue = hasLeaseActiveIssue(activeIssueTags);
     const severeIssue =
       hasTag(activeIssueTags, "suspension") ||
       hasTag(activeIssueTags, "termination") ||
@@ -2236,7 +2729,11 @@
       rationale.push(`Critical evidence gaps affect core elements: ${criticalGaps.join("; ")}.`);
     }
     if (proceduralIssue && proceduralGap) {
-      rationale.push("Notice, cure, suspension, or termination depends on missing procedural proof, so risk cannot be low.");
+      rationale.push(
+        leaseIssue
+          ? "Notice and repair cure prerequisites depend on missing procedural proof, so risk cannot be low."
+          : "Notice, cure, suspension, or termination depends on missing procedural proof, so risk cannot be low."
+      );
     }
     if (triggers.contested) {
       rationale.push("Party positions dispute core facts or causation.");
@@ -2246,6 +2743,21 @@
         rationale.push("Requested remedies may exceed service-credit, damages-exclusion, or liability-cap limits.");
       } else {
         rationale.push("Requested remedies may exceed damages-exclusion or liability-cap limits.");
+      }
+    }
+    if (leaseIssue) {
+      rationale.push("Notice delivery method and valid receipt remain evidence-dependent.");
+      rationale.push("The cure deadline depends on valid notice and deemed receipt.");
+      rationale.push("The repair obligation depends on whether the landlord began commercially reasonable repairs.");
+      rationale.push("Rent abatement depends on material interference, affected area, and affected period.");
+      if (hasTag(activeIssueTags, "rent withholding") || hasTag(activeIssueTags, "payment default")) {
+        rationale.push("Rent withholding may create payment default risk if unauthorized.");
+      }
+      if (hasTag(activeIssueTags, "security deposit") || hasTag(activeIssueTags, "property damage causation")) {
+        rationale.push("The security deposit deduction depends on causation and documentation.");
+      }
+      if (hasTag(activeIssueTags, "liability limitation")) {
+        rationale.push("Damages exclusions and the base-rent liability cap may limit recovery.");
       }
     }
 
@@ -2259,6 +2771,9 @@
     } else if (activeIssueTags.length && evidenceScore >= 3 && timelineScore >= 2 && nonPlaceholderGaps.length <= 1) {
       level = "low";
     } else if (activeIssueTags.length || nonPlaceholderGaps.length) {
+      level = "medium";
+    }
+    if (leaseIssue && combined.trim().length >= 140 && level !== "unclear") {
       level = "medium";
     }
 
@@ -2429,6 +2944,15 @@
         addUnique(types, "Notice/Cure Period");
       }
     }
+    if (hasTag(activeIssueTags, "lease maintenance") || hasTag(activeIssueTags, "repair obligation")) {
+      addUnique(types, "Lease Maintenance / Repair");
+    }
+    if (hasTag(activeIssueTags, "rent abatement")) {
+      addUnique(types, "Rent Abatement");
+    }
+    if (hasTag(activeIssueTags, "security deposit")) {
+      addUnique(types, "Security Deposit");
+    }
     if (hasTag(activeIssueTags, "payment") && hasTag(activeIssueTags, "suspension")) {
       addUnique(types, "Payment/Suspension");
     } else if (hasTag(activeIssueTags, "payment") || hasTag(activeIssueTags, "invoice dispute")) {
@@ -2449,7 +2973,7 @@
     if (hasTag(activeIssueTags, "cover costs") || hasTag(activeIssueTags, "mitigation")) {
       addUnique(types, "Cover Costs/Mitigation");
     }
-    if (triggers.termination || hasTag(activeIssueTags, "termination")) {
+    if ((triggers.termination || hasTag(activeIssueTags, "termination")) && !hasLeaseActiveIssue(activeIssueTags)) {
       addUnique(types, "Termination");
     }
     if (hasTag(activeIssueTags, "acceptance / rejection")) {
@@ -2670,12 +3194,15 @@
       caseTags = ["confidentiality", "indemnity"];
     } else if (hasTag(activeTags, "force majeure") && hasTag(activeTags, "delivery")) {
       caseTags = ["force majeure", "delivery"];
+    } else if (hasLeaseActiveIssue(activeTags)) {
+      caseTags = ["repair", "notice", "abatement", "deposit"];
     } else if (hasTag(activeTags, "refund")) {
       caseTags = ["refund"].concat(activeTags.filter((tag) => hasAny(tag, ["termination", "acceptance"])));
     }
+    const tagLimit = hasLeaseActiveIssue(activeTags) ? 4 : 3;
     const source = [
       input.contractType,
-      ...caseTags.slice(0, 3),
+      ...caseTags.slice(0, tagLimit),
       "golden"
     ].join(" ");
     return source

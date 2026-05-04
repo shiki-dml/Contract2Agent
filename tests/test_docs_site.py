@@ -378,6 +378,120 @@ CONFIDENTIALITY_IP_INDEMNITY_FIXTURE = {
 }
 
 
+LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE = {
+    "contractType": "Lease",
+    "disputeType": "Notice/Cure Period",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Evidence-first",
+    "desiredOutcome": (
+        "Determine whether the tenant properly triggered the landlord's repair "
+        "obligations, whether the landlord failed to cure within the contractual "
+        "period, whether rent abatement or early termination is available, and "
+        "whether the landlord can deduct repair costs from the security deposit."
+    ),
+    "contractText": (
+        "This Commercial Lease requires the landlord to maintain the building roof, "
+        "exterior walls, HVAC main units, and common plumbing systems in good "
+        "working order.\n\n"
+        "The tenant must maintain the leased premises in clean condition and is "
+        "responsible for damage caused by the tenant's employees, contractors, "
+        "invitees, or misuse of the premises.\n\n"
+        "If the tenant claims that the landlord failed to perform a maintenance "
+        "obligation, the tenant must give written notice describing the condition, "
+        "affected area, and requested repair. The landlord has 10 business days "
+        "after receipt of the notice to begin commercially reasonable repairs, "
+        "except in emergencies requiring faster action.\n\n"
+        "If the landlord fails to begin commercially reasonable repairs within the "
+        "cure period and the condition materially interferes with the tenant's use "
+        "of the premises, the tenant may claim reasonable rent abatement for the "
+        "affected period and affected area.\n\n"
+        "The tenant may not withhold rent unless the lease expressly allows rent "
+        "abatement or a court order permits withholding. Unauthorized withholding "
+        "is a payment default.\n\n"
+        "At lease expiration, the landlord may deduct from the security deposit "
+        "only unpaid rent, documented repair costs for tenant-caused damage beyond "
+        "ordinary wear and tear, and other amounts expressly allowed under this "
+        "Lease. The landlord must provide an itemized deposit statement within 30 "
+        "days after surrender.\n\n"
+        "Neither party is liable for indirect, incidental, consequential, special, "
+        "punitive, or lost-profit damages. Total liability is capped at twelve "
+        "months of base rent, except for unpaid rent, intentional misconduct, or "
+        "tenant-caused property damage.\n\n"
+        "Neither party is responsible for delay caused by force majeure events "
+        "beyond its reasonable control, provided the affected party gives prompt "
+        "written notice and uses commercially reasonable mitigation efforts.\n\n"
+        "All notices must be sent by email and certified mail to the notice "
+        "addresses listed in the lease schedule. Notices are deemed received two "
+        "business days after mailing or the next business day after email "
+        "transmission, whichever occurs later."
+    ),
+    "disputeDescription": (
+        "The tenant operates a small retail showroom. On September 3, the tenant "
+        "discovered water intrusion near the ceiling after heavy rain. The tenant "
+        "sent an email to the landlord on September 4 stating that water was "
+        "entering the showroom and damaging display fixtures.\n\n"
+        "The landlord responded on September 7 and said it would inspect the issue. "
+        "A roof contractor inspected the building on September 15 and found "
+        "deteriorated roof flashing. The tenant says the landlord did not begin "
+        "repairs within the 10-business-day cure period after notice.\n\n"
+        "The tenant withheld 40% of October rent and demanded rent abatement for "
+        "September 4 through October 12, arguing that part of the showroom was "
+        "unusable. The landlord argues that the tenant's September 4 email was not "
+        "a proper lease notice because it was not also sent by certified mail to "
+        "the lease schedule notice address.\n\n"
+        "The landlord completed roof repairs on October 12. At move-out on "
+        "November 1, the landlord deducted $8,500 from the security deposit for "
+        "damaged display flooring and repainting. The tenant disputes the "
+        "deductions and says the damage was caused by the roof leak, not tenant "
+        "misuse.\n\n"
+        "No party claims unpaid invoices, SaaS downtime, service credits, platform "
+        "suspension, third-party IP claims, indemnity, confidential information "
+        "disclosure, government orders, natural disasters, strikes, war, or other "
+        "force majeure events."
+    ),
+    "claimantPosition": (
+        "Tenant claims the landlord failed to begin commercially reasonable roof "
+        "repairs within the 10-business-day cure period after the September 4 "
+        "notice. Tenant seeks rent abatement for the affected showroom area, "
+        "return of the $8,500 security deposit deduction, and reimbursement for "
+        "damaged display fixtures."
+    ),
+    "respondentPosition": (
+        "Landlord claims the tenant did not send a valid contractual notice because "
+        "the September 4 email was not also sent by certified mail to the lease "
+        "schedule notice address. Landlord argues that the October rent withholding "
+        "was unauthorized and that the $8,500 security deposit deduction was "
+        "supported by documented tenant-caused damage beyond ordinary wear and tear."
+    ),
+    "evidence": (
+        "Available:\n"
+        "- Lease schedule identifying landlord and tenant notice addresses\n"
+        "- Tenant email dated September 4 reporting water intrusion\n"
+        "- Landlord response email dated September 7\n"
+        "- Roof contractor inspection report dated September 15\n"
+        "- Contractor invoice showing roof repairs completed October 12\n"
+        "- Tenant photos of water intrusion and damaged display fixtures\n"
+        "- October rent ledger showing 40% rent withholding\n"
+        "- Move-out inspection report dated November 1\n"
+        "- Security deposit statement deducting $8,500\n"
+        "- Flooring repair invoice and repainting invoice from landlord\n"
+        "- Tenant photos showing water damage near the affected showroom area\n\n"
+        "Missing or unclear:\n"
+        "- Proof that the September 4 notice was sent by certified mail\n"
+        "- Whether the September 4 email was sent to the exact lease schedule notice email address\n"
+        "- Whether the roof leak materially interfered with the tenant's use of the premises\n"
+        "- Square footage or area affected by the leak\n"
+        "- Whether the landlord began commercially reasonable repairs within 10 business days after valid receipt\n"
+        "- Whether the flooring and repainting damage was caused by roof leak or tenant misuse\n"
+        "- Whether the $8,500 deduction was limited to damage beyond ordinary wear and tear\n"
+        "- Calculation of rent abatement for the affected area and affected period\n"
+        "- Evidence supporting display-fixture damages"
+    ),
+    "metadata": '{"property":"retail showroom"}',
+}
+
+
 def test_github_pages_entrypoint_references_existing_static_assets() -> None:
     demo_html = ROOT / "docs" / "playground" / "index.html"
     html = demo_html.read_text(encoding="utf-8")
@@ -1209,6 +1323,304 @@ def test_playground_confidentiality_ip_gaps_next_steps_preview_and_exports_are_s
         assert forbidden not in preview_issues
 
 
+def test_playground_lease_repair_abatement_filters_false_issue_families() -> None:
+    diagnosis = _run_playground_diagnosis(
+        LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE
+    )["diagnosis"]
+    active_tags = {tag.lower() for tag in diagnosis["active_issue_tags"]}
+    dispute_text = diagnosis["dispute_type"]
+    clause_text = "\n".join(diagnosis["clause_signals"]).lower()
+
+    assert diagnosis["contract_type"] == "Lease"
+    assert "SaaS Agreement" not in diagnosis["contract_type"]
+
+    for expected in (
+        "lease maintenance",
+        "repair obligation",
+        "notice",
+        "cure period",
+        "rent abatement",
+        "rent withholding",
+        "payment default",
+        "security deposit",
+        "tenant-caused damage",
+        "property damage causation",
+        "damages",
+        "liability limitation",
+    ):
+        assert expected in active_tags
+
+    for forbidden in (
+        "force majeure",
+        "saas",
+        "sla",
+        "service credit",
+        "platform suspension",
+        "suspension",
+        "invoice dispute",
+        "refund",
+        "prepaid fees",
+        "confidentiality",
+        "indemnity",
+        "intellectual property",
+        "liquidated damages",
+        "cover costs",
+    ):
+        assert forbidden not in active_tags
+
+    for expected_type in (
+        "Lease Maintenance / Repair",
+        "Notice/Cure Period",
+        "Rent Abatement",
+        "Security Deposit",
+        "Damages/Liability",
+    ):
+        assert expected_type in dispute_text
+
+    for forbidden_type in (
+        "Force Majeure",
+        "SaaS",
+        "SLA/Service Credit",
+        "Payment/Invoice Dispute",
+        "Refund",
+        "Confidentiality",
+        "Indemnity",
+        "Intellectual Property",
+        "Suspension",
+        "Liquidated Damages",
+        "Cover Costs",
+        "Termination",
+    ):
+        assert forbidden_type not in dispute_text
+
+    assert "force majeure clause mentioned but not fact-triggered" in clause_text
+    assert "sla/service credit" not in clause_text
+    assert "invoice timing" not in clause_text
+    assert "liquidated damages" not in clause_text
+    assert "cover costs" not in clause_text
+
+
+def test_playground_lease_repair_key_issues_timeline_and_gaps_are_fact_specific() -> None:
+    diagnosis = _run_playground_diagnosis(
+        LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE
+    )["diagnosis"]
+    key_issue_text = "\n".join(diagnosis["key_issues"])
+    timeline_text = "\n".join(diagnosis["timeline_facts"])
+    gaps_text = "\n".join(diagnosis["evidence_gaps"])
+    risk_text = "\n".join(diagnosis["risk"]["rationale"]).lower()
+
+    assert diagnosis["risk_signal"] == "medium"
+    assert diagnosis["risk"]["evidence_dependent"] is True
+
+    for required in (
+        "September 4 tenant email satisfied the lease notice requirement",
+        "certified mail was also required",
+        "September 4 email was sent to the lease schedule notice email address",
+        "email plus certified mail rule",
+        "10-business-day cure period was triggered",
+        "landlord began commercially reasonable roof repairs",
+        "September 15 roof contractor inspection qualifies",
+        "October 12 was timely enough",
+        "water intrusion materially interfered",
+        "rent abatement is available for September 4 through October 12",
+        "affected area and affected period",
+        "40% October rent withholding was authorized rent abatement or an unauthorized payment default",
+        "$8,500 security deposit deduction",
+        "roof leak or tenant misuse",
+        "November 1 move-out/surrender",
+        "display-fixture damages",
+        "twelve months of base rent liability cap",
+    ):
+        assert required in key_issue_text
+
+    for forbidden in (
+        "claimed lost revenue",
+        "invoked external event",
+        "force majeure",
+        "SaaS",
+        "SLA",
+        "service credits",
+        "invoices",
+        "invoice dispute",
+        "suspension",
+        "order form",
+        "refund",
+        "prepaid",
+        "indemnity",
+        "confidentiality",
+        "IP claim",
+        "liquidated damages",
+        "cover costs",
+    ):
+        assert forbidden.lower() not in key_issue_text.lower()
+
+    for expected_timeline in (
+        "September 3: tenant discovered water intrusion.",
+        "September 4: tenant sent email notice reporting water intrusion.",
+        "September 7: landlord responded and said it would inspect.",
+        "September 15: roof contractor inspected and found deteriorated roof flashing.",
+        "October rent: tenant withheld 40% of rent.",
+        "October 12: landlord completed roof repairs.",
+        "November 1: move-out inspection or surrender event.",
+        "30 days after surrender: deadline for itemized deposit statement from November 1, if applicable.",
+        "10-business-day repair cure period: calculate from valid/deemed receipt once notice delivery method is verified.",
+        "Deemed receipt rule: two business days after mailing or next business day after email transmission, whichever occurs later.",
+    ):
+        assert expected_timeline in timeline_text
+
+    for expected_gap in (
+        "Proof that the September 4 notice was sent by certified mail",
+        "Whether the September 4 email was sent to the exact lease schedule notice email address",
+        "Whether the roof leak materially interfered with the tenant's use of the premises",
+        "Square footage or area affected by the leak",
+        "10-business-day cure deadline calculation from valid or deemed receipt",
+        "Whether the landlord began commercially reasonable repairs within 10 business days after valid receipt",
+        "Whether the flooring and repainting damage was caused by roof leak or tenant misuse",
+        "Whether the $8,500 deduction was limited to damage beyond ordinary wear and tear",
+        "Calculation of rent abatement for the affected area and affected period",
+        "Evidence supporting display-fixture damages",
+        "Proof of itemized deposit statement timing within 30 days after surrender",
+    ):
+        assert expected_gap in gaps_text
+
+    for forbidden_gap in (
+        "signed agreement",
+        "lost revenue calculation",
+        "invoice dates",
+        "invoice receipt",
+        "order form",
+        "sla monitoring",
+        "integration logs",
+        "indemnity notice proof",
+        "technical ip comparison",
+    ):
+        assert forbidden_gap not in gaps_text.lower()
+
+    for expected_risk in (
+        "notice delivery method and valid receipt remain evidence-dependent",
+        "cure deadline depends on valid notice and deemed receipt",
+        "repair obligation depends on whether the landlord began commercially reasonable repairs",
+        "rent abatement depends on material interference, affected area, and affected period",
+        "rent withholding may create payment default risk if unauthorized",
+        "security deposit deduction depends on causation and documentation",
+        "base-rent liability cap may limit recovery",
+    ):
+        assert expected_risk in risk_text
+
+    for forbidden_risk in (
+        "force majeure",
+        "external event",
+        "lost revenue",
+        "suspension",
+        "invoice dispute",
+        "saas",
+        "sla",
+        "service-credit",
+        "indemnity",
+        "confidentiality",
+    ):
+        assert forbidden_risk not in risk_text
+
+
+def test_playground_lease_repair_next_steps_preview_and_exports_are_scoped() -> None:
+    output = _run_playground_diagnosis(LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE)
+    diagnosis = output["diagnosis"]
+    exported = json.loads(output["json"])
+    markdown = output["markdown"]
+    test_case = output["test_case"]
+    next_steps = "\n".join(exported["suggested_next_steps"])
+    active_section = markdown.split("## Active Issue Tags", 1)[1].split(
+        "## Key Issues", 1
+    )[0]
+
+    for expected_step in (
+        "Build a September 3 / September 4 / September 7 / September 15 / October rent / October 12 / November 1 timeline.",
+        "Verify the lease schedule notice addresses.",
+        "Verify whether the September 4 notice was sent by both required methods: email and certified mail.",
+        "Calculate deemed receipt under the lease notice rule.",
+        "Calculate the 10-business-day cure deadline after valid receipt.",
+        "Determine whether the September 15 inspection qualifies as beginning commercially reasonable repairs.",
+        "Compare repair start, contractor inspection, and October 12 completion records.",
+        "Quantify the affected showroom area and affected period.",
+        "Calculate permissible rent abatement by affected area and affected period.",
+        "Assess whether the 40% October rent withholding was authorized rent abatement or a payment default.",
+        "Compare the $8,500 security deposit deduction with move-out photos, repair invoices, and the ordinary wear-and-tear standard.",
+        "Determine whether flooring and repainting damage was caused by the roof leak or tenant misuse.",
+        "Review itemized deposit statement timing and sufficiency.",
+        "Review consequential/lost-profit damages exclusions and twelve months of base rent liability cap.",
+        "Evaluate recoverability of display-fixture damages.",
+    ):
+        assert expected_step in next_steps
+
+    for forbidden_step in (
+        "invoice / notice / cure / suspension",
+        "order form",
+        "suspension",
+        "termination",
+        "lost revenue",
+        "saas",
+        "sla",
+        "service credits",
+        "platform access",
+        "force majeure notice",
+        "external event mitigation",
+        "indemnity notice",
+        "ip comparison",
+        "refund calculation",
+        "liquidated damages",
+        "cover purchase",
+    ):
+        assert forbidden_step not in next_steps.lower()
+
+    assert exported["active_issue_tags"] == diagnosis["active_issue_tags"]
+    assert exported["issue_tags"] == diagnosis["active_issue_tags"]
+    assert exported["key_issues"] == diagnosis["key_issues"]
+    assert exported["clause_signals"] == diagnosis["clause_signals"]
+    assert exported["evidence_gaps"] == diagnosis["evidence_gaps"]
+    assert exported["risk"]["rationale"] == diagnosis["risk"]["rationale"]
+    assert exported["timeline_facts"] == diagnosis["timeline_facts"]
+    assert exported["suggested_next_steps"] == diagnosis["suggested_next_steps"]
+    assert "force majeure" not in active_section.lower()
+    assert "Whether the invoked external event qualifies" not in markdown
+    assert "Whether claimed lost revenue is barred" not in markdown
+
+    assert test_case["case_name"] == "lease_repair_notice_abatement_deposit_golden"
+    preview_issues = {
+        issue.lower()
+        for issue in test_case["expected_outputs"]["must_include_issues"]
+    }
+    for expected in (
+        "notice",
+        "cure period",
+        "repair obligation",
+        "lease maintenance",
+        "rent abatement",
+        "rent withholding",
+        "payment default",
+        "security deposit",
+        "tenant-caused damage",
+        "property damage causation",
+        "damages",
+        "liability limitation",
+    ):
+        assert expected in preview_issues
+    for forbidden in (
+        "force majeure",
+        "saas",
+        "sla",
+        "service credit",
+        "invoice dispute",
+        "refund",
+        "confidentiality",
+        "indemnity",
+        "intellectual property",
+        "liquidated damages",
+        "cover costs",
+        "suspension",
+    ):
+        assert forbidden not in preview_issues
+
+
 def test_playground_diagnosis_runs_do_not_cross_contaminate_issue_templates() -> None:
     refund_then_confidentiality = _run_playground_diagnoses_sequentially(
         [REFUND_TERMINATION_ACCEPTANCE_FIXTURE, CONFIDENTIALITY_IP_INDEMNITY_FIXTURE]
@@ -1251,6 +1663,58 @@ def test_playground_diagnosis_runs_do_not_cross_contaminate_issue_templates() ->
     refund_text = json.dumps(saas_then_refund).lower()
     for forbidden in ("service credit", "uptime", "suspension"):
         assert forbidden not in refund_text
+
+    force_then_lease = _run_playground_diagnoses_sequentially(
+        [POSITIVE_FORCE_MAJEURE_DELIVERY_FIXTURE, LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE]
+    )[1]
+    saas_then_lease = _run_playground_diagnoses_sequentially(
+        [SAAS_NOTICE_CURE_FIXTURE, LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE]
+    )[1]
+    refund_then_lease = _run_playground_diagnoses_sequentially(
+        [REFUND_TERMINATION_ACCEPTANCE_FIXTURE, LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE]
+    )[1]
+    confidentiality_then_lease = _run_playground_diagnoses_sequentially(
+        [CONFIDENTIALITY_IP_INDEMNITY_FIXTURE, LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE]
+    )[1]
+
+    for diagnosis in (
+        force_then_lease,
+        saas_then_lease,
+        refund_then_lease,
+        confidentiality_then_lease,
+    ):
+        text = json.dumps(
+            {
+                "active_issue_tags": diagnosis["active_issue_tags"],
+                "dispute_type": diagnosis["dispute_type"],
+                "key_issues": diagnosis["key_issues"],
+                "timeline_facts": diagnosis["timeline_facts"],
+                "evidence_gaps": diagnosis["evidence_gaps"],
+                "suggested_next_steps": diagnosis["suggested_next_steps"],
+                "risk": diagnosis["risk"],
+            }
+        ).lower()
+        for forbidden in (
+            "whether the invoked external event qualifies",
+            "force majeure notice",
+            "external event mitigation",
+            "sla/uptime",
+            "service credit",
+            "uptime",
+            "platform access",
+            "suspension",
+            "integration error logs",
+            "refund calculation",
+            "prepaid fee",
+            "performed vs unperformed",
+            "invoice dispute",
+            "confidentiality",
+            "indemnity",
+            "ip claim",
+            "public workspace",
+            "technical comparison",
+        ):
+            assert forbidden not in text
 
 
 def test_mkdocs_nav_preserves_github_pages_playground_route() -> None:
