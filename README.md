@@ -50,6 +50,37 @@ flowchart LR
     G --> M[Human Review Items]
 ```
 
+## Trace-Based Diagnosis
+
+Final-output-only evals can miss where an agent failed. AgentDoctor keeps the
+intermediate trace visible: tool-call order, forbidden tools, tool errors,
+side effects after failed reads, required output sections, checker behavior,
+monitor behavior, parser coverage, prompt gaps, and eval expectations.
+
+Given a contract and traces, AgentDoctor helps answer what went wrong, which
+part of the system is responsible, whether a rule is too loose or too strict,
+whether checker or monitor logic missed a violation, and what concrete change
+should be reviewed next.
+
+## Diagnosis Issue Protocol
+
+`c2a diagnose`, `c2a check-all --diagnose`, and `c2a why` use a stable
+`DiagnosisIssue` protocol. Each issue includes severity, category, strictness,
+affected agent part, summary, natural-language cause, machine-readable
+evidence, deterministic confidence, likely location, responsibility, suggested
+fix, structured patch shape, and suggested regression trace when available.
+
+The stable diagnosis enums live in `contract2agent.diagnosis_schema`:
+
+- `DiagnosisCategory`
+- `Strictness`
+- `Severity`
+- `AffectedAgentPart`
+
+Diagnosis reports include total issue counts, counts by category, counts by
+affected agent part, structured issues, and a rule coverage matrix. Markdown
+and YAML reports render the same stable fields for review and automation.
+
 ## Quick Start
 
 AgentDoctor is not currently documented as a published package. Install it from a local checkout:
@@ -138,7 +169,25 @@ Docs: [Auto Mode](docs/auto.md)
 
 ### Failure Taxonomy
 
-Failure taxonomy turns raw failures into structured classes such as `TOOL_MISSING`, `TOOL_ORDER_ERROR`, `OUTPUT_SCHEMA_ERROR`, `HALLUCINATION_RISK`, and `SAFETY_RISK`. It matters because auto repair, patch preview, baseline comparison, and human-readable reports need to know what class of failure occurred and what kind of fix is appropriate.
+Failure taxonomy turns raw failures into structured classes such as
+`TOOL_MISSING`, `TOOL_ORDER_ERROR`, `OUTPUT_SCHEMA_ERROR`,
+`HALLUCINATION_RISK`, and `SAFETY_RISK`. It matters because auto repair, patch
+preview, baseline comparison, and human-readable reports need to know what
+class of failure occurred and what kind of fix is appropriate.
+
+The stable failure type labels are `CONFIG_ERROR`, `TASK_INCOMPLETE`,
+`TOOL_MISSING`, `TOOL_ORDER_ERROR`, `TOOL_ARGUMENT_ERROR`,
+`FORBIDDEN_TOOL_CALL`, `OUTPUT_FORMAT_ERROR`, `OUTPUT_SCHEMA_ERROR`,
+`ERROR_HANDLING_MISSING`, `HALLUCINATION_RISK`, `LOOP_RISK`,
+`LOW_STABILITY`, `REGRESSION`, `SAFETY_RISK`, `SCORER_UNCERTAIN`, and
+`UNKNOWN`. Severity is tracked separately as `info`, `warning`, `error`, or
+`critical`, so the same failure type can have different operational impact in
+different contexts.
+
+Quick, deep, and auto runs produce findings with trace and scorer evidence.
+Triage can also surface potential risks before tests have run. Patch previews
+and auto mode use these failure types to choose fix strategies, validation tags,
+human-review gates, and rollback-oriented baseline checks.
 
 Docs: [Failure Taxonomy](docs/failure-taxonomy.md)
 

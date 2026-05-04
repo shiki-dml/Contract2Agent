@@ -564,7 +564,7 @@ def _cmd_check_all(
 
     if diagnose:
         diagnosis_path = contract.parent / "reports" / "diagnosis_report.md"
-        _write_diagnosis_for_traces(
+        diagnosis_report = _write_diagnosis_for_traces(
             loaded_contract=loaded_contract,
             traces_dir=traces,
             manifest=manifest,
@@ -573,6 +573,7 @@ def _cmd_check_all(
             profile=profile,
             write_regression_traces_dir=write_regression_traces_dir,
         )
+        console.print("\n".join(_diagnosis_summary_lines(diagnosis_report)))
         console.print(f"Wrote diagnosis report to {diagnosis_path}")
     return 1 if unexpected else 0
 
@@ -598,7 +599,7 @@ def _cmd_diagnose(
         requirement.read_text(encoding="utf-8") if requirement is not None else None
     )
     eval_data = _load_yaml_mapping(eval_dataset) if eval_dataset is not None else None
-    _write_diagnosis_for_traces(
+    report = _write_diagnosis_for_traces(
         loaded_contract=loaded_contract,
         traces_dir=traces,
         manifest=manifest,
@@ -609,6 +610,7 @@ def _cmd_diagnose(
         profile=profile,
         write_regression_traces_dir=write_regression_traces_dir,
     )
+    console.print("\n".join(_diagnosis_summary_lines(report)))
     console.print(f"Wrote diagnosis report to {out}")
     return 0
 
@@ -626,7 +628,8 @@ def _cmd_why(
     loaded_contract = load_contract(contract)
     loaded_trace = load_trace_file_or_empty(trace)
     manifest = _load_manifest(manifest_path) if manifest_path is not None else {}
-    manifest_case = manifest.get(trace.stem, {})
+    manifest_case = dict(manifest.get(trace.stem, {}))
+    manifest_case.setdefault("name", trace.stem)
     result = check_trace(
         loaded_contract,
         loaded_trace,
@@ -663,7 +666,7 @@ def _write_diagnosis_for_traces(
     eval_dataset: dict[str, Any] | None = None,
     profile: str = "balanced",
     write_regression_traces_dir: Path | None = None,
-) -> None:
+) -> Any:
     traces_by_case = _load_trace_directory(traces_dir)
     check_rows: list[dict[str, Any]] = []
     for case_name in sorted(traces_by_case):
@@ -692,7 +695,7 @@ def _write_diagnosis_for_traces(
             console.print(
                 f"Wrote {count} regression trace(s) to {write_regression_traces_dir}"
             )
-        return
+        return report
     if normalized_format == "yaml":
         write_diagnosis_report_yaml(report, out)
         if write_regression_traces_dir is not None:
@@ -700,7 +703,7 @@ def _write_diagnosis_for_traces(
             console.print(
                 f"Wrote {count} regression trace(s) to {write_regression_traces_dir}"
             )
-        return
+        return report
     raise ValueError("--format must be markdown or yaml")
 
 
@@ -784,15 +787,22 @@ def _check_result_row(
 
 
 def _why_report_lines(explanation: dict[str, Any]) -> list[str]:
+    issues = explanation.get("issues") or []
+    main_issue = issues[0] if issues else {}
     lines = [
         f"Result: {explanation['result']}",
+        "",
+        f"Issue ID: {main_issue.get('id') or '-'}",
         "",
         "Natural-language explanation:",
         str(explanation["natural_language_cause"]),
         "",
         f"Relevant rule: {explanation.get('rule') or '-'}",
+        f"Severity: {explanation.get('severity') or '-'}",
+        f"Category: {explanation.get('category') or '-'}",
         f"Strictness: {explanation.get('strictness') or '-'}",
         f"Affected agent part: {explanation.get('affected_agent_part') or '-'}",
+        f"Confidence: {explanation.get('confidence') if explanation.get('confidence') is not None else '-'}",
         f"Likely location: {explanation.get('likely_location') or '-'}",
         "",
         f"Suggested fix: {explanation.get('suggested_fix') or '-'}",
@@ -800,6 +810,62 @@ def _why_report_lines(explanation: dict[str, Any]) -> list[str]:
     evidence = explanation.get("evidence")
     if evidence:
         lines.extend(["", "Evidence:", json.dumps(evidence, indent=2, sort_keys=True)])
+    responsibility = main_issue.get("responsibility")
+    if responsibility:
+        lines.extend(
+            [
+                "",
+                "Responsibility:",
+                json.dumps(responsibility, indent=2, sort_keys=True),
+            ]
+        )
+    suggested_patch = main_issue.get("suggested_patch")
+    if suggested_patch:
+        lines.extend(
+            [
+                "",
+                "Suggested patch:",
+                json.dumps(suggested_patch, indent=2, sort_keys=True),
+            ]
+        )
+    suggested_trace = main_issue.get("suggested_regression_trace")
+    if suggested_trace:
+        lines.extend(
+            [
+                "",
+                "Suggested regression trace:",
+                json.dumps(suggested_trace, indent=2, sort_keys=True),
+            ]
+        )
+    return lines
+
+
+def _diagnosis_summary_lines(report: Any) -> list[str]:
+    lines = [
+        "Diagnosis summary:",
+        f"- Total issues: {report.total_issues}",
+    ]
+    if getattr(report, "issue_counts_by_category", None):
+        counts = ", ".join(
+            f"{category}={count}"
+            for category, count in sorted(report.issue_counts_by_category.items())
+        )
+        lines.append(f"- Issue counts by category: {counts}")
+    else:
+        lines.append("- Issue counts by category: none")
+    if getattr(report, "issue_counts_by_affected_part", None):
+        counts = ", ".join(
+            f"{part}={count}"
+            for part, count in sorted(report.issue_counts_by_affected_part.items())
+        )
+        lines.append(f"- Issue counts by affected agent part: {counts}")
+    else:
+        lines.append("- Issue counts by affected agent part: none")
+    for issue in list(getattr(report, "issues", []))[:3]:
+        lines.append(
+            f"- {issue.id}: {issue.severity} {issue.category} "
+            f"{issue.strictness} {issue.affected_agent_part} - {issue.summary}"
+        )
     return lines
 
 

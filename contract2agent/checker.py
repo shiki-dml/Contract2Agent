@@ -388,9 +388,9 @@ def _check_trace_shape(trace: list[TraceEvent], result: CheckResult) -> None:
                     evidence={"step": index, "event": event},
                 )
                 return
-            if not isinstance(event.get("result"), dict):
+            if not isinstance(event.get("result"), dict) and "status" not in event:
                 result.add_failure(
-                    f"Event {index}: tool_result result must be an object. "
+                    f"Event {index}: tool_result result must be an object or include a status. "
                     "This violates rule: malformed_trace.",
                     rule="malformed_trace",
                     evidence={"step": index, "tool": tool, "event": event},
@@ -521,9 +521,18 @@ def _find_previous_status(
         if (
             event.get("type") == "tool_result"
             and event.get("tool") == tool
-            and event.get("result", {}).get("status") == status
+            and _tool_result_status(event) == status
         ):
             return index, event
+    return None
+
+
+def _tool_result_status(event: TraceEvent) -> str | None:
+    if "status" in event:
+        return str(event.get("status"))
+    result = event.get("result")
+    if isinstance(result, dict) and "status" in result:
+        return str(result.get("status"))
     return None
 
 

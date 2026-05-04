@@ -2,11 +2,21 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 from typing import Any
 
 from contract2agent.checker import CheckResult, check_trace, is_refusal
+from contract2agent.diagnosis_schema import (
+    AffectedAgentPart,
+    DiagnosisCategory,
+    DiagnosisIssue,
+    DiagnosisReport,
+    RuleCoverageItem,
+    Strictness,
+    issue_from_legacy_failure,
+    make_issue,
+    to_plain_data,
+)
 from contract2agent.schema import AgentContract
 
 try:
@@ -17,23 +27,8 @@ except ModuleNotFoundError:  # pragma: no cover - PyYAML is a declared dependenc
 
 TraceEvent = dict[str, Any]
 
-ALLOWED_CATEGORIES = {
-    "contract_too_loose",
-    "contract_too_strict",
-    "checker_too_loose",
-    "checker_too_strict",
-    "monitor_too_loose",
-    "monitor_too_strict",
-    "agent_prompt_too_weak",
-    "parser_missed_constraint",
-    "eval_expectation_too_strict",
-    "eval_expectation_ambiguous",
-    "contract_conflict",
-    "rule_uncovered",
-    "agent_behavior_failure",
-}
-
-ALLOWED_STRICTNESS = {"too_loose", "too_strict", "ambiguous", "not_applicable"}
+ALLOWED_CATEGORIES = {item.value for item in DiagnosisCategory}
+ALLOWED_STRICTNESS = {item.value for item in Strictness}
 
 SECTION_VARIANTS = {
     "Proof ideas": ["Proof sketch", "Proof outline"],
@@ -43,53 +38,6 @@ SECTION_VARIANTS = {
     "Definition": ["Definitions"],
     "Definitions": ["Definition"],
 }
-
-
-@dataclass
-class DiagnosisIssue:
-    id: str
-    severity: str
-    category: str
-    summary: str
-    evidence: dict[str, Any] = field(default_factory=dict)
-    strictness: str = "not_applicable"
-    affected_agent_part: str = "capability_scope"
-    natural_language_cause: str = ""
-    confidence: float = 0.75
-    confidence_reason: list[str] = field(default_factory=list)
-    responsibility: dict[str, Any] = field(default_factory=dict)
-    likely_location: str = ""
-    suggested_fix: str = ""
-    suggested_patch: dict[str, Any] | None = None
-    suggested_requirement_prompt: str | None = None
-    suggested_agent_prompt: str | None = None
-    suggested_regression_trace: list[dict[str, Any]] | None = None
-
-    def __post_init__(self) -> None:
-        if self.category not in ALLOWED_CATEGORIES:
-            raise ValueError(f"Unsupported diagnosis category: {self.category}")
-        if self.strictness not in ALLOWED_STRICTNESS:
-            raise ValueError(f"Unsupported strictness: {self.strictness}")
-        if not self.natural_language_cause:
-            self.natural_language_cause = self.summary
-        if not self.responsibility:
-            self.responsibility = {
-                "primary": self.likely_location or "unknown",
-                "secondary": [],
-                "not_responsible": [],
-            }
-        if not self.confidence_reason:
-            self.confidence_reason = ["Deterministic trace and contract heuristic."]
-
-
-@dataclass
-class DiagnosisReport:
-    contract_name: str
-    total_issues: int
-    issues: list[DiagnosisIssue] = field(default_factory=list)
-    issue_counts_by_category: dict[str, int] = field(default_factory=dict)
-    rule_coverage: dict[str, Any] | None = None
-
 
 def diagnose_evaluation(
     contract: AgentContract,
@@ -184,7 +132,11 @@ def diagnose_evaluation(
         )
         if eval_issue is not None:
             add_issue(eval_issue)
-        elif expected_to_fail is not True and _missing_required_output(contract, trace):
+        elif (
+            expected_to_fail is not True
+            and _result_rule(result) in {None, "final_output_contains"}
+            and _missing_required_output(contract, trace)
+        ):
             add_issue(_missing_output_issue(contract, case_name, trace, result))
 
     for issue in _parser_missed_constraint_issues(contract, requirement_text):
@@ -196,15 +148,16 @@ def diagnose_evaluation(
     for issue in _rule_uncovered_issues(coverage, profile):
         add_issue(issue)
 
-    issues = _filter_issues_for_profile(issues, profile)
+    issues = _sort_issues(_filter_issues_for_profile(issues, profile))
     _renumber_issue_ids(issues)
-    counts = dict(Counter(issue.category for issue in issues))
-    return DiagnosisReport(
+    coverage_items = [
+        RuleCoverageItem.from_dict(entry)
+        for entry in coverage.get("rules", [])
+    ]
+    return DiagnosisReport.from_issues(
         contract_name=contract.name,
-        total_issues=len(issues),
-        issue_counts_by_category=counts,
         issues=issues,
-        rule_coverage=coverage,
+        rule_coverage=coverage_items,
     )
 
 
@@ -277,6 +230,21 @@ def suggest_minimal_patch(
         return issue.suggested_patch
 
     if issue.affected_agent_part == "error_handling":
+        if issue.category == "agent_behavior_failure":
+            return {
+                "target": "generated_project/agent/prompts/system.md",
+                "type": "add_tool_error_handling_instruction",
+                "instruction": (
+                    "If pdf_reader returns file_not_found, stop and ask for a valid "
+                    "file path. Do not call markdown_writer after a failed read."
+                ),
+            }
+        if issue.category == "checker_too_loose":
+            return {
+                "target": "contract2agent/checker.py",
+                "type": "enforce_tool_error_rule",
+                "rule": "no_write_on_missing_file",
+            }
         return {
             "target": "agent_contract.yaml",
             "type": "add_rule",
@@ -292,18 +260,26 @@ def suggest_minimal_patch(
             },
         }
 
+    if issue.affected_agent_part == "tool_ordering" and issue.category == "agent_behavior_failure":
+        return {
+            "target": "generated_project/agent/prompts/system.md",
+            "type": "add_tool_order_instruction",
+            "instruction": (
+                "Call pdf_reader and wait for status=ok before calling markdown_writer."
+            ),
+        }
+
     if issue.affected_agent_part == "forbidden_tool_control":
         tool = str(issue.evidence.get("tool") or issue.evidence.get("missing_tool") or "web_search")
-        target = (
-            "contract2agent/checker.py"
-            if issue.category == "checker_too_loose"
-            else "agent_contract.yaml"
-        )
-        patch_type = (
-            "enforce_forbidden_tools"
-            if issue.category == "checker_too_loose"
-            else "add_forbidden_tool"
-        )
+        if issue.category == "checker_too_loose":
+            target = "contract2agent/checker.py"
+            patch_type = "enforce_forbidden_tools"
+        elif issue.category == "agent_behavior_failure":
+            target = "generated_project/agent/prompts/system.md"
+            patch_type = "add_forbidden_tool_refusal"
+        else:
+            target = "agent_contract.yaml"
+            patch_type = "add_forbidden_tool"
         return {"target": target, "type": patch_type, "tool": tool}
 
     if issue.category in {"eval_expectation_too_strict", "eval_expectation_ambiguous"}:
@@ -453,24 +429,27 @@ def explain_trace_result(
     eval_dataset: dict[str, Any] | None = None,
     profile: str = "balanced",
 ) -> dict[str, Any]:
+    case_name = str((manifest_case or {}).get("name") or "trace")
     if check_result is None:
         result = check_trace(
             contract,
             trace,
             expected_failure=(manifest_case or {}).get("expected_to_fail"),
         )
-        row = _check_result_to_row("trace", result, manifest_case or {})
+        row = _check_result_to_row(case_name, result, manifest_case or {})
     elif isinstance(check_result, CheckResult):
-        row = _check_result_to_row("trace", check_result, manifest_case or {})
+        row = _check_result_to_row(case_name, check_result, manifest_case or {})
     else:
         row = dict(check_result)
-        row.setdefault("case", "trace")
+        row["case"] = case_name
 
-    manifest = {"cases": [dict({"name": "trace"}, **(manifest_case or {}))]}
+    manifest_payload = dict(manifest_case or {})
+    manifest_payload["name"] = case_name
+    manifest = {"cases": [manifest_payload]}
     report = diagnose_evaluation(
         contract,
         [row],
-        {"trace": trace},
+        {case_name: trace},
         manifest=manifest,
         requirement_text=requirement_text,
         eval_dataset=eval_dataset,
@@ -478,6 +457,24 @@ def explain_trace_result(
     )
     report.issues = [issue for issue in report.issues if issue.category != "rule_uncovered"]
     passed = _result_passed(row)
+    if not report.issues and not passed:
+        fallback_issue = issue_from_legacy_failure(
+            str(row.get("rule") or "unknown_failure"),
+            summary=f"Trace failed rule {row.get('rule') or 'unknown_failure'}.",
+            evidence={
+                "trace_name": row.get("case", "trace"),
+                "violated_rule": row.get("rule"),
+                "checker_message": row.get("message"),
+                "checker_evidence": row.get("evidence", {}),
+            },
+        )
+        fallback_issue.suggested_patch = suggest_minimal_patch(fallback_issue, contract)
+        if fallback_issue.suggested_regression_trace is None:
+            fallback_issue.suggested_regression_trace = generate_regression_trace_for_issue(
+                fallback_issue
+            )
+        fallback_issue.id = "ATD001"
+        report.issues = [fallback_issue]
     if report.issues:
         issue = report.issues[0]
         explanation = issue.natural_language_cause
@@ -485,6 +482,10 @@ def explain_trace_result(
         affected_agent_part = issue.affected_agent_part
         suggested_fix = issue.suggested_fix
         likely_location = issue.likely_location
+        category = issue.category
+        severity = issue.severity
+        confidence = issue.confidence
+        evidence = issue.evidence
     elif passed:
         explanation = (
             "The trace passes because it satisfies the contract checks. No forbidden "
@@ -495,6 +496,10 @@ def explain_trace_result(
         affected_agent_part = "capability_scope"
         suggested_fix = "No repair is suggested for this trace."
         likely_location = "-"
+        category = None
+        severity = "info"
+        confidence = 1.0
+        evidence = row.get("evidence", {})
     else:
         explanation = (
             "The trace fails because the checker found a contract violation. Review "
@@ -505,19 +510,26 @@ def explain_trace_result(
         affected_agent_part = "trace_checker"
         suggested_fix = "Inspect the failed rule and add a focused regression trace."
         likely_location = "contract2agent/checker.py"
+        category = "agent_behavior_failure"
+        severity = "error"
+        confidence = 0.6
+        evidence = row.get("evidence", {})
 
     return {
         "result": "PASS" if passed else "FAIL",
         "passed": passed,
         "rule": row.get("rule"),
         "message": row.get("message"),
-        "evidence": row.get("evidence", {}),
+        "evidence": evidence,
+        "severity": severity,
+        "category": category,
         "natural_language_cause": explanation,
         "strictness": strictness,
         "affected_agent_part": affected_agent_part,
+        "confidence": confidence,
         "likely_location": likely_location,
         "suggested_fix": suggested_fix,
-        "issues": [asdict(issue) for issue in report.issues],
+        "issues": [issue.to_dict() for issue in report.issues],
     }
 
 
@@ -528,19 +540,21 @@ def write_diagnosis_report_markdown(
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    by_part = Counter(issue.affected_agent_part for issue in report.issues)
     by_severity: dict[str, list[DiagnosisIssue]] = {
         severity: [issue for issue in report.issues if issue.severity == severity]
         for severity in ("error", "warning", "info")
     }
 
     lines = [
-        "# Repair-oriented Strictness Diagnosis",
+        "# Diagnosis Report",
         "",
         "## Executive Summary",
         "",
-        f"Contract: {report.contract_name}",
+        f"Contract: {report.contract_name or '-'}",
         f"Total issues: {report.total_issues}",
+        f"Errors: {len(by_severity['error'])}",
+        f"Warnings: {len(by_severity['warning'])}",
+        f"Info: {len(by_severity['info'])}",
         "",
     ]
     if report.issues:
@@ -552,38 +566,40 @@ def write_diagnosis_report_markdown(
 
     lines.extend(["", "## Issue Counts by Category", ""])
     if report.issue_counts_by_category:
+        lines.extend(["| Category | Count |", "| --- | ---: |"])
         for category in sorted(report.issue_counts_by_category):
-            lines.append(f"- {category}: {report.issue_counts_by_category[category]}")
+            lines.append(f"| {category} | {report.issue_counts_by_category[category]} |")
     else:
         lines.append("- No issues found.")
 
     lines.extend(["", "## Issue Counts by Affected Agent Part", ""])
-    if by_part:
-        for part in sorted(by_part):
-            lines.append(f"- {part}: {by_part[part]}")
+    if report.issue_counts_by_affected_part:
+        lines.extend(["| Affected Part | Count |", "| --- | ---: |"])
+        for part in sorted(report.issue_counts_by_affected_part):
+            lines.append(f"| {part} | {report.issue_counts_by_affected_part[part]} |")
     else:
         lines.append("- No issues found.")
 
     lines.extend(["", "## Rule Coverage Matrix", ""])
-    if report.rule_coverage and report.rule_coverage.get("rules"):
+    if report.rule_coverage:
         lines.extend(
             [
-                "| Rule | Kind | Status | Positive Trace | Negative Trace | Covered By | Uncovered Reason |",
+                "| Rule | Kind | Positive Trace | Negative Trace | Status | Covered By | Uncovered Reason |",
                 "| --- | --- | --- | --- | --- | --- | --- |",
             ]
         )
-        for entry in report.rule_coverage["rules"]:
+        for item in report.rule_coverage:
             lines.append(
                 "| "
                 + " | ".join(
                     [
-                        _escape_table_text(str(entry.get("rule_name", "-"))),
-                        _escape_table_text(str(entry.get("rule_kind", "-"))),
-                        _escape_table_text(str(entry.get("status", "-"))),
-                        "yes" if entry.get("has_positive_trace") else "no",
-                        "yes" if entry.get("has_negative_trace") else "no",
-                        _escape_table_text(", ".join(entry.get("covered_by", [])) or "-"),
-                        _escape_table_text(str(entry.get("uncovered_reason") or "-")),
+                        _escape_table_text(str(item.rule_name)),
+                        _escape_table_text(str(item.rule_kind or "-")),
+                        "yes" if item.has_positive_trace else "no",
+                        "yes" if item.has_negative_trace else "no",
+                        _escape_table_text(item.status),
+                        _escape_table_text(", ".join(item.covered_by) or "-"),
+                        _escape_table_text(str(item.uncovered_reason or "-")),
                     ]
                 )
                 + " |"
@@ -591,14 +607,12 @@ def write_diagnosis_report_markdown(
     else:
         lines.append("No rule coverage information is available.")
 
-    lines.extend(["", "## Issues by Severity", ""])
-    for severity in ("error", "warning", "info"):
-        severity_issues = by_severity[severity]
-        if not severity_issues:
-            continue
-        lines.extend([f"### {severity.title()}", ""])
-        for issue in severity_issues:
+    lines.extend(["", "## Issues", ""])
+    if report.issues:
+        for issue in report.issues:
             lines.extend(_markdown_issue_lines(issue))
+    else:
+        lines.append("No diagnosis issues were generated.")
 
     target.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
@@ -619,23 +633,24 @@ def write_diagnosis_report_yaml(
 
 def _markdown_issue_lines(issue: DiagnosisIssue) -> list[str]:
     lines = [
-        f"#### {issue.id}: {issue.summary}",
+        f"### {issue.id}: {issue.summary}",
         "",
+        f"- Severity: {issue.severity}",
         f"- Category: {issue.category}",
         f"- Strictness: {issue.strictness}",
         f"- Affected agent part: {issue.affected_agent_part}",
+        f"- Confidence: {issue.confidence:.2f}",
+        f"- Likely location: {issue.likely_location or '-'}",
         "",
-        "**Natural-language cause:**",
+        "Cause:",
         "",
         issue.natural_language_cause,
         "",
-        f"- Confidence: {issue.confidence:.2f}",
-        f"- Likely location: {issue.likely_location}",
-        f"- Suggested fix: {issue.suggested_fix}",
     ]
     _append_markdown_block(lines, "Confidence reason", issue.confidence_reason)
     _append_markdown_block(lines, "Responsibility", issue.responsibility)
     _append_markdown_block(lines, "Evidence", issue.evidence)
+    lines.extend(["Suggested fix:", "", issue.suggested_fix or "-"])
     _append_markdown_block(lines, "Suggested patch", issue.suggested_patch)
     if issue.suggested_requirement_prompt:
         lines.extend(
@@ -687,7 +702,7 @@ def _unexpected_pass_issue(
             "not_responsible": ["evals/user_dataset.yaml"],
         }
 
-    if inferred_rule == "no_write_on_missing_file" or _write_after_missing_file(trace):
+    if _write_after_missing_file(trace):
         affected = "error_handling"
         cause = (
             "The agent's missing-file error handling is too loose. The trace shows "
@@ -717,7 +732,7 @@ def _unexpected_pass_issue(
             "notes. If pdf_reader returns file_not_found, the agent must stop and "
             "must not call markdown_writer."
         )
-    elif inferred_rule == "must_read_before_write":
+    elif _write_before_read(trace):
         affected = "tool_ordering"
         cause = (
             "The agent's tool-ordering logic is too loose. The trace allows "
@@ -756,7 +771,7 @@ def _unexpected_pass_issue(
         patch = None
         requirement_prompt = "Clarify the behavior this counterexample is intended to forbid."
 
-    return DiagnosisIssue(
+    return make_issue(
         id="pending",
         severity="error",
         category=category,
@@ -839,7 +854,7 @@ def _unexpected_fail_issue(
         affected = "trace_checker"
         fix = "Narrow the failed rule so it rejects only the intended violation."
 
-    return DiagnosisIssue(
+    return make_issue(
         id="pending",
         severity="error",
         category=category,
@@ -907,7 +922,7 @@ def _forbidden_tool_issue(
         "correctly rejects this, so the agent prompt or policy-following behavior "
         "needs repair."
     )
-    return DiagnosisIssue(
+    return make_issue(
         id="pending",
         severity="error" if passed else "warning",
         category=category,
@@ -945,7 +960,7 @@ def _forbidden_tool_issue(
             "explain that the action is outside the contract."
         ),
         suggested_regression_trace=trace or generate_regression_trace_for_issue(
-            DiagnosisIssue(
+            make_issue(
                 id="pending",
                 severity="warning",
                 category="agent_behavior_failure",
@@ -963,7 +978,7 @@ def _monitor_too_loose_issue(
     call: tuple[int, str, TraceEvent],
 ) -> DiagnosisIssue:
     step, tool, event = call
-    return DiagnosisIssue(
+    return make_issue(
         id="pending",
         severity="error",
         category="monitor_too_loose",
@@ -1015,7 +1030,7 @@ def _forbidden_intent_issue(
     )
     if passed:
         cause += " The checker also accepted this trace, so checker refusal detection needs repair."
-    return DiagnosisIssue(
+    return make_issue(
         id="pending",
         severity="error" if passed else "warning",
         category=category,
@@ -1056,7 +1071,7 @@ def _missing_output_issue(
     result: dict[str, Any],
 ) -> DiagnosisIssue:
     missing = _missing_required_output(contract, trace)
-    return DiagnosisIssue(
+    return make_issue(
         id="pending",
         severity="warning",
         category="agent_prompt_too_weak",
@@ -1121,7 +1136,7 @@ def _eval_expectation_issue(
             if item.casefold().rstrip("s") == variant.casefold().rstrip("s")
             else "eval_expectation_too_strict"
         )
-        return DiagnosisIssue(
+        return make_issue(
             id="pending",
             severity="warning",
             category=category,
@@ -1174,7 +1189,7 @@ def _parser_missed_constraint_issues(
         capability_name = spec["capability"]["name"]
         tool = spec.get("tool")
         issues.append(
-            DiagnosisIssue(
+            make_issue(
                 id="pending",
                 severity="error",
                 category="parser_missed_constraint",
@@ -1215,7 +1230,7 @@ def _parser_missed_constraint_issues(
         [],
     ):
         issues.append(
-            DiagnosisIssue(
+            make_issue(
                 id="pending",
                 severity="error",
                 category="parser_missed_constraint",
@@ -1295,7 +1310,7 @@ def _contract_conflict_issues(
             ),
         }
         issues.append(
-            DiagnosisIssue(
+            make_issue(
                 id="pending",
                 severity="error",
                 category="contract_too_strict",
@@ -1307,7 +1322,7 @@ def _contract_conflict_issues(
             )
         )
         issues.append(
-            DiagnosisIssue(
+            make_issue(
                 id="pending",
                 severity="error",
                 category="contract_conflict",
@@ -1324,7 +1339,7 @@ def _contract_conflict_issues(
         for rule in contract.rules
     ):
         issues.append(
-            DiagnosisIssue(
+            make_issue(
                 id="pending",
                 severity="error",
                 category="contract_conflict",
@@ -1355,7 +1370,7 @@ def _contract_conflict_issues(
 
     if _has_forbidden_web(contract) and _goal_mentions_search(contract.goal):
         issues.append(
-            DiagnosisIssue(
+            make_issue(
                 id="pending",
                 severity="warning",
                 category="contract_conflict",
@@ -1401,18 +1416,12 @@ def _rule_uncovered_issues(
             continue
         rule_name = str(entry.get("rule_name"))
         issues.append(
-            DiagnosisIssue(
+            make_issue(
                 id="pending",
                 severity="info" if profile == "strict" else "warning",
                 category="rule_uncovered",
                 strictness="not_applicable",
-                affected_agent_part=(
-                    "forbidden_intent_refusal"
-                    if "intent" in rule_kind
-                    else "forbidden_tool_control"
-                    if "forbidden" in rule_kind
-                    else "trace_checker"
-                ),
+                affected_agent_part="rule_coverage",
                 natural_language_cause=(
                     f"The {rule_name} restriction is declared in the contract, but "
                     "no eval case or counterexample trace currently tests it. This "
@@ -1437,7 +1446,7 @@ def _rule_uncovered_issues(
                 suggested_fix="Add a regression trace or eval case that exercises this rule.",
                 suggested_patch=entry.get("suggested_test"),
                 suggested_regression_trace=generate_regression_trace_for_issue(
-                    DiagnosisIssue(
+                    make_issue(
                         id="pending",
                         severity="info",
                         category="rule_uncovered",
@@ -1759,7 +1768,7 @@ def _write_after_missing_file(trace: list[TraceEvent]) -> bool:
         if (
             event.get("type") == "tool_result"
             and event.get("tool") == "pdf_reader"
-            and event.get("result", {}).get("status") == "file_not_found"
+            and _tool_result_status(event) == "file_not_found"
         ):
             missing_seen = True
         if (
@@ -1777,7 +1786,7 @@ def _write_before_read(trace: list[TraceEvent]) -> bool:
         if (
             event.get("type") == "tool_result"
             and event.get("tool") == "pdf_reader"
-            and event.get("result", {}).get("status") == "ok"
+            and _tool_result_status(event) == "ok"
         ):
             read_ok = True
         if event.get("type") == "tool_call" and event.get("tool") == "markdown_writer":
@@ -1792,7 +1801,7 @@ def _valid_read_then_write_trace(trace: list[TraceEvent]) -> bool:
         if (
             event.get("type") == "tool_result"
             and event.get("tool") == "pdf_reader"
-            and event.get("result", {}).get("status") == "ok"
+            and _tool_result_status(event) == "ok"
         ):
             read_ok = True
         if (
@@ -1965,10 +1974,19 @@ def _has_terminal_tool_error(contract: AgentContract, trace: list[TraceEvent]) -
             if (
                 event.get("type") == "tool_result"
                 and event.get("tool") == after_tool
-                and event.get("result", {}).get("status") == error_status
+                and _tool_result_status(event) == error_status
             ):
                 return True
     return False
+
+
+def _tool_result_status(event: TraceEvent) -> str | None:
+    if "status" in event:
+        return str(event.get("status"))
+    result = event.get("result")
+    if isinstance(result, dict) and "status" in result:
+        return str(result.get("status"))
+    return None
 
 
 def _looks_like_forbidden_refusal(
@@ -2259,8 +2277,34 @@ def _normalize_profile(profile: str) -> str:
 
 def _renumber_issue_ids(issues: list[DiagnosisIssue]) -> None:
     for index, issue in enumerate(issues, start=1):
-        case = str(issue.evidence.get("case") or issue.evidence.get("rule_name") or "global")
-        issue.id = f"D{index:03d}-{_slug(case)}-{_slug(issue.category)}"
+        issue.id = f"ATD{index:03d}"
+
+
+def _sort_issues(issues: list[DiagnosisIssue]) -> list[DiagnosisIssue]:
+    severity_rank = {"error": 0, "warning": 1, "info": 2}
+    category_rank = {
+        "contract_too_strict": 0,
+        "contract_conflict": 1,
+    }
+
+    def key(issue: DiagnosisIssue) -> tuple[Any, ...]:
+        evidence = issue.evidence or {}
+        trace_name = (
+            evidence.get("trace_name")
+            or evidence.get("case_name")
+            or evidence.get("case")
+            or ""
+        )
+        return (
+            severity_rank.get(issue.severity, 99),
+            category_rank.get(issue.category, 50),
+            issue.category,
+            issue.affected_agent_part,
+            str(trace_name),
+            issue.summary,
+        )
+
+    return sorted(issues, key=key)
 
 
 def _append_markdown_block(lines: list[str], label: str, value: Any) -> None:
@@ -2270,27 +2314,19 @@ def _append_markdown_block(lines: list[str], label: str, value: Any) -> None:
         [
             f"- {label}:",
             "",
-            "```yaml",
-            _safe_yaml(value).rstrip(),
+            "```json",
+            _safe_json(value).rstrip(),
             "```",
         ]
     )
 
 
-def _safe_yaml(value: Any) -> str:
-    if yaml is not None:
-        return yaml.safe_dump(value, sort_keys=False, allow_unicode=True)
-    return json.dumps(value, indent=2, ensure_ascii=False)
+def _safe_json(value: Any) -> str:
+    return json.dumps(_to_plain_data(value), indent=2, sort_keys=True, ensure_ascii=False)
 
 
 def _to_plain_data(value: Any) -> Any:
-    if is_dataclass(value):
-        return asdict(value)
-    if isinstance(value, list):
-        return [_to_plain_data(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _to_plain_data(item) for key, item in value.items()}
-    return value
+    return to_plain_data(value)
 
 
 def _escape_table_text(value: str) -> str:
