@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contract2Agent | Contract Dispute Diagnosis Playground</title>
+    <meta
+      name="description"
+      content="Contract2Agent turns contract text, dispute facts, party positions, evidence, and configuration into structured diagnostic reports."
+    />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#playground">Skip to playground</a>
+
+    <header class="site-header" aria-label="Site header">
+      <nav class="nav-shell" aria-label="Primary navigation">
+        <a class="brand" href="./" aria-label="Contract2Agent home">
+          <span class="brand-mark" aria-hidden="true">C2A</span>
+          <span>Contract2Agent</span>
+        </a>
+        <div class="nav-links" aria-label="Page sections">
+          <a href="#playground">Demo</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#cli">CLI</a>
+          <a href="#disclaimer">Disclaimer</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero section-shell" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Developer-oriented dispute diagnosis</p>
+          <h1 id="hero-title">Contract2Agent</h1>
+          <p class="hero-tagline">
+            Turn contract disputes into structured diagnostic reports and
+            agent-ready workflows.
+          </p>
+          <p class="hero-text">
+            Explore how contract text, dispute facts, party positions, evidence,
+            and configuration can become key issues, clause signals, evidence
+            gaps, risk flags, and Markdown or JSON-style outputs.
+          </p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button primary" href="#playground">Try the Demo</a>
+            <a class="button" href="https://github.com/shiki-dml/AgentDoctor#readme">View README</a>
+            <a class="button" href="#cli">CLI Quickstart</a>
+            <a class="button ghost" href="https://github.com/shiki-dml/AgentDoctor">GitHub Repository</a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-label="Contract2Agent workflow preview">
+          <img
+            src="assets/contract2agent-preview.svg"
+            alt="Contract2Agent converts contract inputs into dispute diagnosis outputs"
+          />
+        </div>
+      </section>
+
+      <section class="metrics section-shell" aria-label="Contract2Agent output highlights">
+        <article>
+          <strong>Inputs</strong>
+          <span>contract, facts, positions, evidence, config</span>
+        </article>
+        <article>
+          <strong>Diagnosis</strong>
+          <span>issues, clause signals, evidence gaps, risk</span>
+        </article>
+        <article>
+          <strong>Outputs</strong>
+          <span>Markdown reports and JSON-style structured data</span>
+        </article>
+      </section>
+
+      <section class="playground section-shell" id="playground" aria-labelledby="playground-title">
+        <div class="section-heading">
+          <p class="eyebrow">Interactive diagnosis playground</p>
+          <h2 id="playground-title">Structure a dispute in the browser</h2>
+          <p>
+            This static demo runs deterministic rules locally. It does not send
+            your text anywhere and does not require a backend or API key.
+          </p>
+        </div>
+
+        <div class="sample-bar" aria-label="Sample cases">
+          <button type="button" class="sample-chip" data-sample="service-payment">
+            Service payment dispute
+          </button>
+          <button type="button" class="sample-chip" data-sample="delivery-delay">
+            Late delivery dispute
+          </button>
+          <button type="button" class="sample-chip" data-sample="termination-cure">
+            Termination and cure-period dispute
+          </button>
+          <button type="button" class="sample-chip" data-sample="refund-dispute">
+            Refund dispute
+          </button>
+          <button type="button" class="sample-chip" data-sample="saas-suspension">
+            SaaS suspension dispute
+          </button>
+        </div>
+
+        <div class="workspace-grid">
+          <form class="diagnosis-form panel" id="diagnosis-form">
+            <div class="form-toolbar">
+              <div>
+                <h3>Case Inputs</h3>
+                <p>Configure the contract, facts, positions, and desired output.</p>
+              </div>
+              <div class="inline-actions">
+                <label class="select-label" for="sample-select">Sample case</label>
+                <select id="sample-select" name="sampleSelect">
+                  <option value="service-payment">Service payment</option>
+                  <option value="delivery-delay">Late delivery</option>
+                  <option value="termination-cure">Termination/cure</option>
+                  <option value="refund-dispute">Refund</option>
+                  <option value="saas-suspension">SaaS suspension</option>
+                </select>
+                <button type="button" class="button compact" id="load-sample">Load Sample</button>
+              </div>
+            </div>
+
+            <div class="control-grid">
+              <label>
+                <span>Contract type</span>
+                <select id="contract-type" name="contractType">
+                  <option>Service Agreement</option>
+                  <option>SaaS Agreement</option>
+                  <option>Lease</option>
+                  <option>Freelance Contract</option>
+                  <option>Sales Contract</option>
+                  <option>Other</option>
+                </select>
+              </label>
+              <label>
+                <span>Dispute type</span>
+                <select id="dispute-type" name="disputeType">
+                  <option>Payment Delay</option>
+                  <option>Late Delivery</option>
+                  <option>Termination</option>
+                  <option>Refund</option>
+                  <option>Liability</option>
+                  <option>Notice/Cure Period</option>
+                  <option>Other</option>
+                </select>
+              </label>
+              <label>
+                <span>Output format preference</span>
+                <select id="output-format" name="outputFormat">
+                  <option>Summary</option>
+                  <option>Detailed</option>
+                  <option>JSON-style</option>
+                  <option>Markdown-style</option>
+                </select>
+              </label>
+              <label>
+                <span>Diagnosis depth</span>
+                <select id="diagnosis-depth" name="diagnosisDepth">
+                  <option>Quick</option>
+                  <option selected>Standard</option>
+                  <option>Detailed</option>
+                </select>
+              </label>
+              <label>
+                <span>Risk tolerance / mode</span>
+                <select id="risk-mode" name="riskMode">
+                  <option>Balanced</option>
+                  <option>Conservative</option>
+                  <option>Evidence-first</option>
+                  <option>Escalation review</option>
+                </select>
+              </label>
+              <label>
+                <span>Desired outcome</span>
+                <input
+                  id="desired-outcome"
+                  name="desiredOutcome"
+                  type="text"
+                  placeholder="e.g. recover unpaid invoices, preserve service, negotiate refund"
+                />
+              </label>
+            </div>
+
+            <label>
+              <span>Contract text</span>
+              <textarea
+                id="contract-text"
+                name="contractText"
+                rows="7"
+                placeholder="Paste the relevant contract clauses here."
+              ></textarea>
+            </label>
+
+            <label>
+              <span>Dispute description</span>
+              <textarea
+                id="dispute-description"
+                name="disputeDescription"
+                rows="5"
+                placeholder="Describe what happened, including dates, deadlines, notices, and events."
+              ></textarea>
+            </label>
+
+            <div class="two-column">
+              <label>
+                <span>Claimant position</span>
+                <textarea
+                  id="claimant-position"
+                  name="claimantPosition"
+                  rows="4"
+                  placeholder="What the claimant says happened and what they want."
+                ></textarea>
+              </label>
+              <label>
+                <span>Respondent position</span>
+                <textarea
+                  id="respondent-position"
+                  name="respondentPosition"
+                  rows="4"
+                  placeholder="What the respondent says happened and their defenses or objections."
+                ></textarea>
+              </label>
+            </div>
+
+            <label>
+              <span>Evidence</span>
+              <textarea
+                id="evidence"
+                name="evidence"
+                rows="4"
+                placeholder="List emails, invoices, logs, receipts, signed documents, messages, proof, or other records."
+              ></textarea>
+            </label>
+
+            <label>
+              <span>Optional metadata / configuration</span>
+              <textarea
+                id="metadata"
+                name="metadata"
+                rows="3"
+                placeholder='Optional: {"jurisdiction": "example", "currency": "USD", "timeline": "known"}'
+              ></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button type="submit" class="button primary">Analyze / Diagnose</button>
+              <button type="button" class="button" id="copy-markdown">Copy Markdown</button>
+              <button type="button" class="button" id="copy-json">Copy JSON</button>
+              <button type="button" class="button subtle" id="reset-form">Reset / Clear</button>
+            </div>
+            <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
+          </form>
+
+          <aside class="result-panel panel" aria-labelledby="result-title">
+            <div class="result-heading">
+              <div>
+                <p class="eyebrow">Diagnosis result</p>
+                <h3 id="result-title">Structured preview</h3>
+              </div>
+              <span class="risk-badge risk-unclear" id="risk-badge">Unclear</span>
+            </div>
+            <div id="result-output" class="result-output">
+              <div class="empty-state">
+                <strong>Load a sample or enter a dispute, then run Analyze.</strong>
+                <p>
+                  The result panel will show a summary, issue tags, clause
+                  signals, evidence gaps, risk, next steps, Markdown, and JSON.
+                </p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="workflow section-shell" id="workflow" aria-labelledby="workflow-title">
+        <div class="section-heading">
+          <p class="eyebrow">How it structures disputes</p>
+          <h2 id="workflow-title">From messy materials to reviewable outputs</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <span class="feature-number">01</span>
+            <h3>Input normalization</h3>
+            <p>
+              Collect contract text, dispute facts, party positions, evidence,
+              desired outcome, and configuration into a single case shape.
+            </p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">02</span>
+            <h3>Issue detection</h3>
+            <p>
+              Look for payment, delivery, termination, notice, liability,
+              confidentiality, force majeure, SLA, and evidence indicators.
+            </p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">03</span>
+            <h3>Clause relevance</h3>
+            <p>
+              Surface likely clause families such as payment timing, acceptance
+              criteria, cure periods, suspension rights, and limitation terms.
+            </p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">04</span>
+            <h3>Evidence gaps</h3>
+            <p>
+              Highlight missing records, dates, notices, objection evidence,
+              delivery proof, acceptance criteria, and damages calculations.
+            </p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">05</span>
+            <h3>Structured output</h3>
+            <p>
+              Produce Markdown and JSON-style previews that can be inspected,
+              shared, tested, or fed into agent-oriented workflows.
+            </p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">06</span>
+            <h3>CLI/report workflow</h3>
+            <p>
+              Move from visual exploration to deterministic local commands for
+              reproducible reports, checks, and why-style explanations.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="cli section-shell" id="cli" aria-labelledby="cli-title">
+        <div class="section-heading">
+          <p class="eyebrow">CLI bridge</p>
+          <h2 id="cli-title">Use the same structured mindset locally</h2>
+          <p>
+            The Pages demo is the fastest way to see the flow. The
+            <code>c2a</code> CLI is for local, reproducible diagnosis workflows
+            and report generation.
+          </p>
+        </div>
+        <div class="code-layout">
+          <div class="command-list" aria-label="Confirmed CLI commands">
+            <code>c2a --help</code>
+            <code>c2a diagnose --help</code>
+            <code>c2a check-all --diagnose</code>
+            <code>c2a why --help</code>
+            <code>c2a demo</code>
+            <code>c2a check</code>
+            <code>c2a check-all</code>
+          </div>
+          <pre><code>python -m pip install -e ".[dev]"
+
+c2a --help
+c2a demo --out demo_project
+c2a counterexamples demo_project/agent_contract.yaml --out demo_project/traces/counterexamples
+c2a check-all --contract demo_project/agent_contract.yaml --traces demo_project/traces/counterexamples --diagnose</code></pre>
+        </div>
+      </section>
+
+      <section class="disclaimer section-shell" id="disclaimer" aria-labelledby="disclaimer-title">
+        <div>
+          <p class="eyebrow">Important disclaimer</p>
+          <h2 id="disclaimer-title">Developer tool, not legal advice</h2>
+          <p>
+            Contract2Agent is a developer tool and structured analysis demo. It
+            is not legal advice and does not replace professional judgment.
+            Outputs are preliminary and should be reviewed by qualified
+            professionals before legal decisions are made.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="section-shell footer-shell">
+        <span>Contract2Agent</span>
+        <span>Static GitHub Pages demo served from <code>docs/</code>.</span>
+      </div>
+    </footer>
+
+    <script src="assets/app.js"></script>
+  </body>
+</html>

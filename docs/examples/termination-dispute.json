@@ -1,0 +1,22 @@
+{
+  "name": "Termination and cure-period dispute",
+  "contract_type": "Freelance Contract",
+  "dispute_type": "Notice/Cure Period",
+  "desired_outcome": "Evaluate whether termination was valid and what evidence is missing.",
+  "contract_text": "Either party may terminate for material breach after written notice and a 14-day cure period. Termination for convenience requires 30 days written notice. Work accepted before termination remains payable.",
+  "dispute_description": "The client terminated the contractor immediately after a missed milestone. The contractor says no written breach notice was sent and the milestone was delayed because source materials arrived late.",
+  "claimant_position": "The contractor seeks payment for accepted work and argues immediate termination violated the cure-period clause.",
+  "respondent_position": "The client says the missed milestone was material, the delay was repeated, and informal messages gave enough warning.",
+  "evidence": [
+    "Milestone plan",
+    "Slack messages",
+    "Email thread",
+    "Partial acceptance notes",
+    "Invoice"
+  ],
+  "configuration": {
+    "output_format": "Summary",
+    "diagnosis_depth": "Standard",
+    "risk_mode": "Conservative"
+  }
+}

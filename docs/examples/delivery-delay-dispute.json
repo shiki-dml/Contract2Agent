@@ -1,0 +1,22 @@
+{
+  "name": "Late delivery dispute",
+  "contract_type": "Sales Contract",
+  "dispute_type": "Late Delivery",
+  "desired_outcome": "Assess whether late delivery supports price reduction or rejection.",
+  "contract_text": "Seller must deliver the hardware batch by March 15. Buyer must inspect within five business days after delivery. Acceptance is based on the delivery schedule and the technical specification in Exhibit A.",
+  "dispute_description": "The shipment arrived on March 29. The buyer sent messages complaining about delay and missing accessories. The seller says logistics delays were outside its control and the buyer accepted the shipment by using the units.",
+  "claimant_position": "The buyer says the missed deadline defeated the deployment plan and caused measurable replacement costs.",
+  "respondent_position": "The seller says the buyer accepted the goods, did not reject within the inspection window, and has not proven damages.",
+  "evidence": [
+    "Shipping receipt",
+    "Delivery confirmation",
+    "Warehouse log",
+    "Buyer messages",
+    "Signed purchase order"
+  ],
+  "configuration": {
+    "output_format": "Detailed",
+    "diagnosis_depth": "Detailed",
+    "risk_mode": "Evidence-first"
+  }
+}

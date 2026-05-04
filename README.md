@@ -1,33 +1,116 @@
 # Contract2Agent
 
-Contract-driven diagnosis and repair suggestions for LLM agents.
+Turn contract disputes into structured diagnostic reports and agent-ready workflows.
 
-Contract2Agent is a lightweight offline CLI tool for diagnosing LLM agent
-behavior from contracts and execution traces. It checks traces against behavior
-contracts, explains loose or strict rules, highlights checker/parser/monitor
-gaps, and produces repair suggestions such as patch previews, rule coverage,
-and regression traces.
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776ab)](https://www.python.org/)
+[![pytest](https://img.shields.io/badge/tests-pytest-0f8f86)](#testing)
+[![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-2454d6)](https://shiki-dml.github.io/AgentDoctor/)
+[![CLI: c2a](https://img.shields.io/badge/CLI-c2a-15202b)](#cli-usage)
+[![Status: Experimental](https://img.shields.io/badge/status-experimental-b45309)](#roadmap)
 
-## At a Glance
+**Contract2Agent** is a developer-oriented contract dispute diagnosis and structured workflow tool. It helps transform contract text, dispute facts, party positions, evidence, and configuration into reviewable outputs: dispute summaries, key issues, clause signals, evidence gaps, risk signals, suggested next steps, and Markdown/JSON-style reports.
 
-| Capability | What you get |
-|---|---|
-| Trace diagnosis | See where the agent's tool flow diverged from the contract. |
-| Strictness checks | Distinguish too-loose rules from too-strict rules and checkers. |
-| Repair suggestions | Review suggested contract, checker, prompt, or eval changes. |
-| Rule coverage | Spot rules that lack positive or negative trace coverage. |
-| Regression traces | Generate focused traces that reproduce the diagnosed gap. |
-| Static playground | Try a browser-side preview without uploading data. |
+**Start here:** [Open GitHub Pages Demo](https://shiki-dml.github.io/AgentDoctor/) | [Quickstart](#cli-quickstart) | [CLI Usage](#cli-usage) | [Examples](#concrete-example-service-payment-dispute) | [Testing](#testing) | [GitHub Pages Setup](#github-pages-setup)
 
-## Quickstart
+> The demo URL was inferred from the current git remote. If the repository is renamed or moved, update this README after enabling GitHub Pages.
 
-Install from a local checkout:
+## Try the GitHub Pages Demo
+
+The fastest way to experience Contract2Agent is the public GitHub Pages demo:
+
+**[https://shiki-dml.github.io/AgentDoctor/](https://shiki-dml.github.io/AgentDoctor/)**
+
+The static demo is served directly from `docs/`. It lets users enter contract text, dispute facts, claimant and respondent positions, evidence, desired outcome, and configuration such as contract type, dispute type, output format, diagnosis depth, and risk mode.
+
+After analysis, the page shows structured diagnosis results: a dispute summary, detected contract/dispute type, key issues, relevant clauses or clause signals, a claimant/respondent matrix, evidence gaps, risk signal, suggested next steps, a Markdown-style report preview, and JSON-style output. A local `docs/index.html` fallback exists for maintainers, but the public GitHub Pages site is the primary entry point.
+
+## Preview
+
+![Contract2Agent preview](docs/assets/contract2agent-preview.svg)
+
+## Why Contract2Agent?
+
+Contract disputes are messy because obligations, facts, deadlines, notices, positions, and evidence are scattered across contract language, emails, invoices, logs, messages, and local assumptions. Contract2Agent gives developers a deterministic way to organize that material into a structured diagnostic format that can be inspected, exported, tested, and used in agent workflows.
+
+It is not trying to be a legal decision maker. It is a workflow layer for making the problem clearer: what is being claimed, what clauses might matter, what evidence is present, what is missing, and what the next structured review step should be.
+
+## What The GitHub Pages Demo Does
+
+### Capture Inputs
+
+The demo accepts the core material that usually defines a contract dispute: contract text, dispute description, claimant position, respondent position, evidence, desired outcome, contract type, dispute type, diagnosis depth, risk mode, output preference, and optional metadata.
+
+### Diagnose The Dispute
+
+Browser-side deterministic rules look for signals such as payment, invoice, refund, delivery, milestone, acceptance, termination, written notice, cure period, liability, damages, force majeure, confidentiality, uptime, SLA, suspension, and evidence terms.
+
+### Surface Clause Signals
+
+The output highlights likely clause families such as payment timing, disputed-invoice language, acceptance criteria, delivery deadlines, cure periods, suspension rights, SLA credits, limitation terms, and remedy language.
+
+### Identify Evidence Gaps
+
+The demo calls out missing records such as signed agreements, invoice dates, payment records, written notices, cure-period timelines, delivery confirmations, acceptance criteria, damages calculations, and respondent objection records.
+
+### Export Structured Output
+
+Results can be copied as Markdown or JSON-style output, making the demo useful for report drafts, fixtures, product demos, and agent workflow experiments.
+
+## Concrete Example: Service Payment Dispute
+
+**Contract clause**
+
+> "The client must pay all undisputed invoices within 30 days. The provider may suspend service after written notice and a 10-day cure period."
+
+**Dispute**
+
+> "The client has not paid two invoices. The provider suspended access after sending one email notice. The client argues the invoices were disputed."
+
+**Example output**
+
+- Key issue: whether invoices were undisputed
+- Relevant clause: payment and cure period
+- Evidence gap: proof of written notice date and dispute notice
+- Risk signal: medium / unclear
+- Suggested next step: build a timeline of invoice, dispute, notice, cure period, and suspension dates
+
+```json
+{
+  "case_type": "service_payment_dispute",
+  "risk_signal": "medium",
+  "key_issues": ["invoice dispute status", "notice and cure period", "suspension timing"],
+  "evidence_gaps": ["date of written notice", "proof invoices were undisputed"],
+  "suggested_next_steps": ["build payment timeline", "attach invoice and notice evidence"]
+}
+```
+
+## Workflow
+
+```mermaid
+flowchart LR
+    A[Contract Text] --> D[Contract2Agent]
+    B[Dispute Facts] --> D
+    C[Party Positions] --> D
+    E[Evidence + Config] --> D
+    D --> F[Dispute Summary]
+    D --> G[Issue Diagnosis]
+    D --> H[Evidence Gaps]
+    D --> I[Risk Signals]
+    D --> J[Markdown / JSON Output]
+    D --> K[Agent-ready Structured Workflow]
+```
+
+## CLI Quickstart
+
+The GitHub Pages demo is for fast visual exploration. The `c2a` CLI is for local, reproducible, testable diagnosis workflows and report generation.
 
 ```bash
+git clone <repo-url>
+cd <repo-name>
 python -m pip install -e ".[dev]"
 ```
 
-Create and diagnose the built-in offline demo:
+Create and diagnose the built-in local demo project:
 
 ```bash
 c2a demo --out demo_project
@@ -35,64 +118,73 @@ c2a counterexamples demo_project/agent_contract.yaml --out demo_project/traces/c
 c2a check-all --contract demo_project/agent_contract.yaml --traces demo_project/traces/counterexamples --diagnose
 ```
 
-For an existing project, start with triage or a quick diagnosis:
+## CLI Usage
+
+These commands exist in the current package entry point:
 
 ```bash
-c2a triage --agent ./agent.yaml
-c2a quick --contract ./agent_contract.yaml
-c2a deep --rounds 3 --review on-fail --contract ./agent_contract.yaml
+c2a --help
+c2a diagnose --help
+c2a check-all --diagnose
+c2a why --help
+c2a demo
+c2a check
+c2a check-all
 ```
 
-Use `c2a` for the CLI. The Python distribution and import package are both
-`contract2agent`. A legacy `agentdoctor` console-script alias is still retained
-for backward compatibility with existing local installs.
+Useful report-oriented commands:
 
-## Example Diagnosis
+```bash
+c2a diagnose --contract ./agent_contract.yaml --traces ./traces --out ./reports/diagnosis.md
+c2a why --contract ./agent_contract.yaml --trace ./traces/example.json --out ./reports/why.md
+c2a check --contract ./agent_contract.yaml --trace ./traces/example.json
+```
+
+Package identity:
+
+- Python distribution: `contract2agent`
+- Python import package: `contract2agent`
+- CLI: `c2a`
+
+## Project Layout
 
 ```text
-ATD001 [error]
-Category: contract_too_loose
-Strictness: too_loose
-Affected part: error_handling
-
-Cause:
-pdf_reader returned file_not_found, but markdown_writer was still called.
-
-Suggested fix:
-Add a rule forbidding markdown_writer after pdf_reader returns file_not_found.
+.
+|-- contract2agent/        # Python package
+|-- docs/                  # GitHub Pages site and MkDocs documentation
+|   |-- index.html         # Static Pages demo entry point
+|   |-- assets/            # CSS, JS, and SVG preview asset
+|   |-- examples/          # Static demo sample cases
+|   `-- audits/            # Preserved audit notes
+|-- examples/              # Repository examples
+|-- scripts/               # Maintenance scripts
+|-- tests/                 # pytest test suite
+|-- pyproject.toml         # Packaging and optional extras
+`-- README.md
 ```
 
-## What It Diagnoses
+## GitHub Pages Setup
 
-- `contract_too_loose`
-- `contract_too_strict`
-- `checker_too_loose`
-- `checker_too_strict`
-- `monitor_too_loose`
-- `monitor_too_strict`
-- `parser_missed_constraint`
-- `contract_conflict`
-- `rule_uncovered`
-- `eval_expectation_too_strict`
+The public site lives in `docs/` and is designed to deploy without npm, a backend, API keys, paid services, or a build step.
 
-## Docs and Playground
+1. Open the repository settings on GitHub.
+2. Go to **Pages**.
+3. Select the target branch.
+4. Select `/docs` as the Pages source folder.
+5. Save and wait for GitHub Pages to publish.
+6. Update the demo URL in this README if the inferred repository URL is not correct.
+7. Set the repository **Website** field to the GitHub Pages URL so the demo is visible from the repository sidebar.
 
-- [Documentation home](docs/index.md)
-- [Getting started](docs/getting-started.md)
-- [CLI reference](docs/cli.md)
-- [Interactive playground](docs/playground.md)
+## Testing
 
-The playground is a static browser-side preview. Full analysis runs through the
-local CLI.
-
-## Development
+Install development dependencies and run the test suite:
 
 ```bash
 python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
-For docs work:
+For documentation checks:
 
 ```bash
 python -m pip install -e ".[docs]"
@@ -100,12 +192,32 @@ python scripts/check_docs_links.py
 python -m mkdocs build --strict
 ```
 
-## Limitations
+## Disclaimer
 
-- Patch suggestions are previews, not automatically applied by the playground.
-- The static playground covers a small deterministic subset of the CLI behavior.
-- Full diagnosis, report writing, and regression trace generation run locally
-  through the CLI.
+Contract2Agent is a developer tool and structured analysis demo. It is not legal advice. The GitHub Pages demo output is preliminary and should be reviewed by qualified professionals before legal decisions are made.
+
+## Roadmap
+
+- Richer GitHub Pages playground interactions
+- More dispute templates and sample cases
+- Better clause detection and evidence-gap heuristics
+- Improved structured diagnosis schema
+- Markdown and JSON export polish
+- More static report previews
+- GitHub Pages documentation refinements
+- More golden tests
+- CLI polish
+
+## Contributing
+
+Pull requests should keep the project deterministic, lightweight, and easy to run locally.
+
+- Run `python -m pytest` before opening PRs.
+- Keep behavior deterministic and testable.
+- Avoid unnecessary external APIs and paid services.
+- Keep the GitHub Pages site static, lightweight, and deployable from `docs/`.
+- Keep docs and CLI behavior aligned.
+- Do not commit caches, virtual environments, generated reports, runtime data, or local junk.
 
 ## License
 

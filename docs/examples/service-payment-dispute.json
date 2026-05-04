@@ -1,0 +1,22 @@
+{
+  "name": "Service payment dispute",
+  "contract_type": "Service Agreement",
+  "dispute_type": "Payment Delay",
+  "desired_outcome": "Recover unpaid invoices while preserving leverage for service suspension.",
+  "contract_text": "The client must pay all undisputed invoices within 30 days. The provider may suspend service after written notice and a 10-day cure period. Disputed invoice amounts must be identified in writing before the payment due date.",
+  "dispute_description": "The client has not paid two monthly invoices. The provider sent one email notice and suspended dashboard access 12 days later. The client argues the invoices were disputed because several deliverables were incomplete.",
+  "claimant_position": "The provider says the invoices were accepted, overdue, and never disputed before the due dates.",
+  "respondent_position": "The client says the invoices were disputed and suspension was premature because the notice did not clearly start the cure period.",
+  "evidence": [
+    "Invoices",
+    "Email notice",
+    "Account suspension log",
+    "Delivery messages",
+    "Signed service agreement"
+  ],
+  "configuration": {
+    "output_format": "Markdown-style",
+    "diagnosis_depth": "Standard",
+    "risk_mode": "Balanced"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "SaaS suspension dispute",
+  "contract_type": "SaaS Agreement",
+  "dispute_type": "Payment Delay",
+  "desired_outcome": "Assess suspension timing and service restoration options.",
+  "contract_text": "Customer must pay undisputed subscription fees within 15 days of invoice. Provider may suspend access after written notice and a 7-day cure period. SLA credits are the exclusive remedy for uptime incidents unless caused by willful misconduct.",
+  "dispute_description": "The provider suspended access after one reminder email. The customer says invoices included disputed overage fees and that an uptime incident created service credits.",
+  "claimant_position": "The provider says core subscription fees were undisputed and overdue, so suspension was allowed after notice.",
+  "respondent_position": "The customer says the notice was vague, overage fees were disputed, and suspension caused operational losses.",
+  "evidence": [
+    "Invoices",
+    "Admin access logs",
+    "Reminder email",
+    "Uptime incident logs",
+    "Customer support messages"
+  ],
+  "configuration": {
+    "output_format": "Detailed",
+    "diagnosis_depth": "Detailed",
+    "risk_mode": "Escalation review"
+  }
+}

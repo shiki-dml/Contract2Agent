@@ -1,0 +1,22 @@
+{
+  "name": "Refund dispute",
+  "contract_type": "Service Agreement",
+  "dispute_type": "Refund",
+  "desired_outcome": "Decide whether a partial refund position is supportable.",
+  "contract_text": "Fees are non-refundable except where services are not delivered after a documented service failure. Client must provide written notice of the alleged failure within 10 days after discovery.",
+  "dispute_description": "The client prepaid for a campaign package and requests a full refund after canceling midway. The provider says work was delivered and the refund clause does not apply.",
+  "claimant_position": "The client says promised launch assets were missing and the campaign could not go live.",
+  "respondent_position": "The provider says draft assets and status logs show substantial delivery, so a full refund is not justified.",
+  "evidence": [
+    "Project board export",
+    "Message thread",
+    "Payment receipt",
+    "Draft asset links",
+    "Cancellation email"
+  ],
+  "configuration": {
+    "output_format": "JSON-style",
+    "diagnosis_depth": "Quick",
+    "risk_mode": "Balanced"
+  }
+}

@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Contract2Agent workflow preview</title>
+  <desc id="desc">Contract, dispute, evidence, and configuration flow into Contract2Agent and become structured dispute diagnosis outputs.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/>
+      <stop offset="1" stop-color="#eef6f4"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#2454d6"/>
+      <stop offset="1" stop-color="#0f8f86"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#172334" flood-opacity=".16"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#2454d6"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="540" rx="24" fill="url(#bg)"/>
+  <path d="M60 82 H900" stroke="#d8e2ee" stroke-width="1"/>
+  <path d="M60 458 H900" stroke="#d8e2ee" stroke-width="1"/>
+
+  <g filter="url(#shadow)">
+    <rect x="360" y="180" width="240" height="150" rx="16" fill="url(#core)"/>
+    <text x="480" y="246" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="28" font-weight="800" fill="#ffffff">Contract2Agent</text>
+    <text x="480" y="281" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="600" fill="#dcecff">diagnosis engine</text>
+  </g>
+
+  <g font-family="Inter, Segoe UI, Arial, sans-serif">
+    <g>
+      <rect x="70" y="88" width="210" height="70" rx="10" fill="#ffffff" stroke="#d7dee8"/>
+      <text x="94" y="120" font-size="17" font-weight="800" fill="#15202b">Contract text</text>
+      <text x="94" y="143" font-size="13" fill="#52606d">clauses, obligations, remedies</text>
+    </g>
+    <g>
+      <rect x="70" y="180" width="210" height="70" rx="10" fill="#ffffff" stroke="#d7dee8"/>
+      <text x="94" y="212" font-size="17" font-weight="800" fill="#15202b">Dispute facts</text>
+      <text x="94" y="235" font-size="13" fill="#52606d">timeline, events, positions</text>
+    </g>
+    <g>
+      <rect x="70" y="272" width="210" height="70" rx="10" fill="#ffffff" stroke="#d7dee8"/>
+      <text x="94" y="304" font-size="17" font-weight="800" fill="#15202b">Evidence</text>
+      <text x="94" y="327" font-size="13" fill="#52606d">emails, invoices, logs, proof</text>
+    </g>
+    <g>
+      <rect x="70" y="364" width="210" height="70" rx="10" fill="#ffffff" stroke="#d7dee8"/>
+      <text x="94" y="396" font-size="17" font-weight="800" fill="#15202b">Configuration</text>
+      <text x="94" y="419" font-size="13" fill="#52606d">type, depth, output format</text>
+    </g>
+  </g>
+
+  <g fill="none" stroke="#2454d6" stroke-width="3" marker-end="url(#arrow)">
+    <path d="M280 123 C318 123 322 211 357 224"/>
+    <path d="M280 215 C315 215 326 238 357 247"/>
+    <path d="M280 307 C315 307 326 286 357 272"/>
+    <path d="M280 399 C318 399 322 314 357 292"/>
+  </g>
+
+  <g fill="none" stroke="#2454d6" stroke-width="3" marker-end="url(#arrow)">
+    <path d="M600 255 C636 255 646 130 680 123"/>
+    <path d="M600 255 C636 255 646 210 680 207"/>
+    <path d="M600 255 C636 255 646 290 680 291"/>
+    <path d="M600 255 C636 255 646 370 680 375"/>
+  </g>
+
+  <g font-family="Inter, Segoe UI, Arial, sans-serif">
+    <g>
+      <rect x="680" y="88" width="210" height="70" rx="10" fill="#ffffff" stroke="#d7dee8"/>
+      <text x="704" y="120" font-size="17" font-weight="800" fill="#15202b">Dispute summary</text>
+      <text x="704" y="143" font-size="13" fill="#52606d">normalized narrative</text>
+    </g>
+    <g>
+      <rect x="680" y="172" width="210" height="70" rx="10" fill="#ffffff" stroke="#d7dee8"/>
+      <text x="704" y="204" font-size="17" font-weight="800" fill="#15202b">Key issues</text>
+      <text x="704" y="227" font-size="13" fill="#52606d">clause and fact conflicts</text>
+    </g>
+    <g>
+      <rect x="680" y="256" width="210" height="70" rx="10" fill="#ffffff" stroke="#d7dee8"/>
+      <text x="704" y="288" font-size="17" font-weight="800" fill="#15202b">Evidence gaps</text>
+      <text x="704" y="311" font-size="13" fill="#52606d">missing records and dates</text>
+    </g>
+    <g>
+      <rect x="680" y="340" width="210" height="70" rx="10" fill="#ffffff" stroke="#d7dee8"/>
+      <text x="704" y="372" font-size="17" font-weight="800" fill="#15202b">Risk signals</text>
+      <text x="704" y="395" font-size="13" fill="#52606d">low, medium, high, unclear</text>
+    </g>
+    <g>
+      <rect x="372" y="378" width="216" height="58" rx="10" fill="#fff7ed" stroke="#fed7aa"/>
+      <text x="480" y="411" text-anchor="middle" font-size="15" font-weight="800" fill="#9a3412">Markdown + JSON Output</text>
+    </g>
+  </g>
+</svg>
