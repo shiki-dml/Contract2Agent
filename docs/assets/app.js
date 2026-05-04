@@ -109,12 +109,31 @@
     delivery: ["delivery", "milestone", "deadline", "delay", "acceptance", "shipment"],
     termination: ["terminate", "termination", "cancel", "cancellation"],
     notice: ["notice", "written notice", "cure period", "breach notice", "cure"],
-    liability: ["damages", "liability", "indemnity", "penalty", "limitation"],
+    liability: ["damages", "liability", "indemnity", "penalty", "limitation", "cap"],
     "force majeure": ["force majeure", "impossibility", "uncontrollable"],
     confidentiality: ["confidential", "nda", "disclosure"],
-    service: ["uptime", "sla", "suspension", "access", "service"],
+    service: ["uptime", "sla", "suspension", "access", "service", "service credit"],
     evidence: ["email", "invoice", "receipt", "log", "message", "signed", "proof"]
   };
+
+  const forceMajeureFactTriggers = [
+    "force majeure notice",
+    "invokes force majeure",
+    "invoked force majeure",
+    "government order",
+    "government action",
+    "natural disaster",
+    "pandemic",
+    "war",
+    "strike",
+    "impossibility",
+    "external disruption",
+    "uncontrollable event",
+    "third-party outage",
+    "third party outage",
+    "performance excused",
+    "prevented performance"
+  ];
 
   const fields = {
     contractType: "contract-type",
@@ -218,182 +237,737 @@
     return matches ? matches.length : 0;
   }
 
-  function buildIssues(data, groups) {
-    const issues = [];
-    const dispute = normalize(data.disputeType);
-    const contract = normalize(data.contractType);
-
-    if (groups.includes("payment") || dispute.includes("payment")) {
-      issues.push("Whether invoices, fees, or refund amounts are owed and undisputed");
-    }
-    if (groups.includes("delivery") || dispute.includes("delivery")) {
-      issues.push("Whether delivery deadlines, milestones, or acceptance criteria were met");
-    }
-    if (groups.includes("termination") || dispute.includes("termination")) {
-      issues.push("Whether termination or cancellation followed the contract process");
-    }
-    if (groups.includes("notice") || dispute.includes("notice") || dispute.includes("cure")) {
-      issues.push("Whether written notice and any cure period were properly triggered");
-    }
-    if (groups.includes("liability") || dispute.includes("liability")) {
-      issues.push("Whether damages, liability limits, penalties, or indemnity terms apply");
-    }
-    if (groups.includes("force majeure")) {
-      issues.push("Whether uncontrollable events or force majeure excuses performance");
-    }
-    if (groups.includes("confidentiality")) {
-      issues.push("Whether confidential information or disclosure obligations are implicated");
-    }
-    if (groups.includes("service") || contract.includes("saas")) {
-      issues.push("Whether service access, SLA credits, suspension rights, or uptime records matter");
-    }
-
-    if (!issues.length) {
-      issues.push("Primary dispute issue is unclear from the current text");
-    }
-
-    return [...new Set(issues)];
+  function dateRegex() {
+    return /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:,\s*\d{4})?\b/gi;
   }
 
-  function buildClauseSignals(data, groups) {
+  function monthRegex() {
+    return /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/gi;
+  }
+
+  function durationRegex() {
+    return /\b\d+\s*-\s*(?:business\s+)?days?\b|\b\d+\s+(?:business\s+)?days?\b|\b\d+\s+weeks?\b/gi;
+  }
+
+  function monthDurationRegex() {
+    return /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve)\s+months?\b/gi;
+  }
+
+  function collectCaseText(data, names) {
+    return names.map((name) => data[name] || "").join(" ");
+  }
+
+  function factText(data) {
+    return collectCaseText(data, [
+      "disputeType",
+      "desiredOutcome",
+      "disputeDescription",
+      "claimantPosition",
+      "respondentPosition",
+      "evidence",
+      "metadata"
+    ]);
+  }
+
+  function allText(data) {
+    return collectCaseText(data, [
+      "contractType",
+      "disputeType",
+      "desiredOutcome",
+      "contractText",
+      "disputeDescription",
+      "claimantPosition",
+      "respondentPosition",
+      "evidence",
+      "metadata"
+    ]);
+  }
+
+  function splitSegments(text) {
+    return String(text || "")
+      .replace(/\r/g, "\n")
+      .split(/[.!?\n]+/)
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+  }
+
+  function addUnique(items, value) {
+    const cleaned = String(value || "").trim().replace(/\s+/g, " ");
+    if (!cleaned) {
+      return;
+    }
+    if (!items.some((item) => normalize(item) === normalize(cleaned))) {
+      items.push(cleaned);
+    }
+  }
+
+  function uniqueValues(items) {
+    const result = [];
+    items.forEach((item) => addUnique(result, item));
+    return result;
+  }
+
+  function hasSignal(signals, phrase) {
+    return signals.some((signal) => normalize(signal).includes(normalize(phrase)));
+  }
+
+  function hasTag(tags, tag) {
+    return tags.some((item) => normalize(item) === normalize(tag));
+  }
+
+  function extractDates(text) {
+    const matches = String(text || "").match(dateRegex());
+    return matches ? uniqueValues(matches.map((match) => match.trim())) : [];
+  }
+
+  function extractDurations(text) {
+    const matches = String(text || "").match(durationRegex());
+    return matches ? uniqueValues(matches.map(cleanDuration)) : [];
+  }
+
+  function cleanDuration(value) {
+    return String(value || "").trim().replace(/\s*-\s*/g, "-").replace(/\s+/g, " ");
+  }
+
+  function findSegmentsNear(text, words) {
+    return splitSegments(text).filter((segment) => hasAny(segment, words));
+  }
+
+  function findDatesNear(text, words) {
+    return uniqueValues(
+      findSegmentsNear(text, words).flatMap((segment) => extractDates(segment))
+    );
+  }
+
+  function findDurationNear(text, words) {
+    const durations = uniqueValues(
+      findSegmentsNear(text, words).flatMap((segment) => extractDurations(segment))
+    );
+    return durations[0] || "";
+  }
+
+  function formatList(items) {
+    const values = uniqueValues(items);
+    if (values.length <= 1) {
+      return values[0] || "";
+    }
+    if (values.length === 2) {
+      return `${values[0]} and ${values[1]}`;
+    }
+    return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
+  }
+
+  function extractInvoiceDates(data) {
+    const source = collectCaseText(data, [
+      "disputeDescription",
+      "claimantPosition",
+      "respondentPosition",
+      "evidence",
+      "metadata"
+    ]);
+    const direct = [];
+    const pattern = /\binvoices?\s+(?:dated|date|dates|of|from)\s+([^.;\n]+)/gi;
+    let match = pattern.exec(source);
+    while (match) {
+      extractDates(match[1]).forEach((date) => addUnique(direct, date));
+      match = pattern.exec(source);
+    }
+    if (direct.length) {
+      return direct;
+    }
+    splitSegments(source).forEach((segment) => {
+      const lower = normalize(segment);
+      if (lower.includes("invoice") && !hasAny(segment, ["notice", "suspend", "termination", "terminated"])) {
+        extractDates(segment).forEach((date) => addUnique(direct, date));
+      }
+    });
+    return direct;
+  }
+
+  function extractNoticeDates(data) {
+    const source = collectCaseText(data, [
+      "disputeDescription",
+      "claimantPosition",
+      "respondentPosition",
+      "evidence",
+      "metadata"
+    ]);
+    return findDatesNear(source, ["notice", "non-payment", "nonpayment", "breach notice", "reminder email"]);
+  }
+
+  function extractActionDates(data) {
+    const source = collectCaseText(data, [
+      "disputeDescription",
+      "claimantPosition",
+      "respondentPosition",
+      "evidence",
+      "metadata"
+    ]);
+    const direct = [];
+    const dateSource = String(source || "");
+    const actionDatePatterns = [
+      /\b(?:suspended|suspend|terminated|terminate|cancelled|canceled)[^.;\n]*?\bon\s+(\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:,\s*\d{4})?\b)/gi,
+      /\b(?:suspension|termination|access suspension log|termination notice)[^.;\n]*?\bdated\s+(\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:,\s*\d{4})?\b)/gi
+    ];
+    actionDatePatterns.forEach((pattern) => {
+      let match = pattern.exec(dateSource);
+      while (match) {
+        addUnique(direct, match[1]);
+        match = pattern.exec(dateSource);
+      }
+    });
+    if (direct.length) {
+      return direct;
+    }
+    return findDatesNear(source, ["suspend", "suspension", "terminated", "termination", "cancelled", "canceled"]);
+  }
+
+  function extractServicePeriods(data) {
+    const source = collectCaseText(data, [
+      "disputeDescription",
+      "claimantPosition",
+      "respondentPosition",
+      "evidence",
+      "metadata"
+    ]);
+    const periods = [];
+    findSegmentsNear(source, ["downtime", "uptime", "sla", "service"]).forEach((segment) => {
+      const months = segment.match(monthRegex()) || [];
+      months.forEach((month) => addUnique(periods, month));
+    });
+    return periods;
+  }
+
+  function extractLiabilityCapPeriod(contractText) {
+    const matches = String(contractText || "").match(monthDurationRegex());
+    return matches ? cleanDuration(matches[0]) : "";
+  }
+
+  function partyName(data, preferred, fallback) {
+    const combined = normalize(allText(data));
+    if (combined.includes(preferred)) {
+      return preferred;
+    }
+    if (preferred === "provider" && combined.includes("seller")) {
+      return "seller";
+    }
+    if (preferred === "provider" && combined.includes("contractor")) {
+      return "contractor";
+    }
+    if (preferred === "customer" && combined.includes("client")) {
+      return "client";
+    }
+    if (preferred === "customer" && combined.includes("buyer")) {
+      return "buyer";
+    }
+    return fallback;
+  }
+
+  function hasForceMajeureFactTrigger(data) {
+    const facts = factText(data);
+    if (hasAny(facts, [
+      "no force majeure",
+      "not force majeure",
+      "does not invoke force majeure",
+      "does not invoke an external event",
+      "no party invokes force majeure",
+      "not invoked force majeure",
+      "force majeure appears only"
+    ])) {
+      return false;
+    }
+    return hasAny(facts, forceMajeureFactTriggers) || /\bforce majeure\b/i.test(facts);
+  }
+
+  function extractFactualTriggers(data) {
+    const facts = factText(data);
+    const lowerFacts = normalize(facts);
+    const dispute = normalize(data.disputeType);
+    const contract = normalize(data.contractType);
+    const invoiceWords = ["invoice", "invoices", "fees", "amount", "overage"];
+    const disputeWords = ["disputed", "dispute", "objected", "objection"];
+
+    return {
+      payment:
+        dispute.includes("payment") ||
+        hasAny(facts, ["unpaid", "overdue", "non-payment", "nonpayment", "failed to pay", "outstanding invoice", "outstanding invoices", "fees were due"]),
+      invoiceDispute:
+        (hasAny(facts, disputeWords) && hasAny(facts, invoiceWords)) ||
+        hasAny(facts, ["invoice dispute notice", "disputed invoice", "disputed invoices", "disputed amount", "overage fees disputed"]),
+      notice:
+        hasAny(facts, ["written notice", "non-payment notice", "nonpayment notice", "notice of breach", "notice of non-payment", "reminder email", "notice was vague", "notice was sent"]),
+      cure:
+        hasAny(facts, ["cure period", "failed to cure", "failure to cure", "waited", "days before suspension", "days before termination"]),
+      suspension:
+        hasAny(facts, ["suspend", "suspension", "suspended", "access log", "restore access", "restoration of access"]),
+      termination:
+        dispute.includes("termination") || hasAny(facts, ["terminate", "termination", "terminated", "cancelled", "canceled"]),
+      delivery:
+        dispute.includes("delivery") || hasAny(facts, ["delivery", "shipment", "milestone", "acceptance", "delayed", "late"]),
+      refund:
+        dispute.includes("refund") || hasAny(facts, ["refund", "refundable", "prepaid"]),
+      service:
+        contract.includes("saas") || hasAny(facts, ["platform", "service", "access", "uptime", "downtime", "sla", "service credit", "support ticket"]),
+      sla:
+        hasAny(facts, ["downtime", "uptime", "sla", "service availability", "service performance", "support tickets", "uptime report"]),
+      serviceCredit:
+        hasAny(facts, ["service credit", "service credits", "sla credits", "credit remedy", "credit amount"]),
+      customerSideCause:
+        hasAny(facts, ["customer-side", "customer side", "integration error", "api authentication", "customer systems", "customer's own integration"]),
+      damages:
+        hasAny(facts, ["damages", "lost revenue", "lost profits", "operational losses", "replacement costs", "beyond service credits", "loss calculation", "claimed revenue"]),
+      liabilityLimitation:
+        hasAny(facts, ["liability cap", "limitation of liability", "consequential damages", "lost-profit", "lost profit", "damages beyond"]),
+      indemnity:
+        hasAny(facts, ["indemnity", "indemnify", "third-party claim", "third party claim"]),
+      penalty:
+        hasAny(facts, ["penalty", "liquidated damages", "late fee penalty"]),
+      forceMajeure: hasForceMajeureFactTrigger(data),
+      contested:
+        hasAny(lowerFacts, ["argues", "claims", "says", "disputed", "never", "caused by", "premature", "too aggressively"]) &&
+        Boolean(data.claimantPosition || data.respondentPosition)
+    };
+  }
+
+  function buildClauseSignals(data) {
     const contractText = normalize(data.contractText);
     const signals = [];
 
-    if (groups.includes("payment") || contractText.includes("invoice")) {
-      signals.push("Payment timing and disputed-invoice language");
+    if (hasAny(contractText, ["pay", "payment", "invoice", "fees", "due", "receipt"])) {
+      addUnique(signals, "payment timing");
     }
-    if (groups.includes("delivery") || contractText.includes("acceptance")) {
-      signals.push("Delivery deadline, milestone, and acceptance criteria");
+    if (hasAny(contractText, ["disputes an invoice", "disputed invoice", "disputed amount", "basis for dispute", "undisputed invoices"])) {
+      addUnique(signals, "disputed invoice procedure");
     }
-    if (groups.includes("termination")) {
-      signals.push("Termination rights and cancellation conditions");
+    if (hasAny(contractText, ["notice address", "order form", "notices must be sent", "sent by email"])) {
+      addUnique(signals, "notice address");
     }
-    if (groups.includes("notice") || contractText.includes("cure")) {
-      signals.push("Written notice, breach notice, and cure-period requirements");
+    if (hasAny(contractText, ["deemed received", "deemed receipt", "next business day"])) {
+      addUnique(signals, "deemed receipt rule");
     }
-    if (groups.includes("liability")) {
-      signals.push("Damages, limitation of liability, penalty, or indemnity allocation");
+    if (hasAny(contractText, ["cure period", "days to cure", "cure"])) {
+      addUnique(signals, "cure period");
     }
-    if (groups.includes("service") || contractText.includes("sla")) {
-      signals.push("Suspension, access, uptime, SLA credit, and service remedy terms");
+    if (hasAny(contractText, ["suspend", "suspension", "suspend access", "affected services"])) {
+      addUnique(signals, "suspension rights");
     }
-    if (groups.includes("force majeure")) {
-      signals.push("Force majeure or impossibility language");
+    if (hasAny(contractText, ["sla", "service credit", "service credits", "exclusive remedy"])) {
+      addUnique(signals, "SLA/service credit");
     }
-    if (groups.includes("confidentiality")) {
-      signals.push("Confidentiality, NDA, and disclosure restrictions");
+    if (hasAny(contractText, ["uptime", "availability"])) {
+      addUnique(signals, "uptime obligation");
+    }
+    if (hasAny(contractText, ["customer-side", "customer side", "customer systems", "integration errors"])) {
+      addUnique(signals, "customer-side systems exclusion");
+    }
+    if (hasAny(contractText, ["consequential", "indirect", "incidental"])) {
+      addUnique(signals, "consequential damages exclusion");
+    }
+    if (hasAny(contractText, ["lost-profit", "lost profit", "lost profits"])) {
+      addUnique(signals, "lost-profit damages exclusion");
+    }
+    if (hasAny(contractText, ["liability cap", "total liability", "capped at", "fees paid"])) {
+      addUnique(signals, "liability cap");
+    }
+    if (hasAny(contractText, ["indemnity", "indemnify"])) {
+      addUnique(signals, "indemnity");
+    }
+    if (hasAny(contractText, ["force majeure"])) {
+      addUnique(
+        signals,
+        hasAny(contractText, ["excluding", "excludes", "exclusion"])
+          ? "force majeure exclusion mentioned but not fact-triggered"
+          : "force majeure clause"
+      );
+    }
+    if (hasAny(contractText, ["delivery", "shipment", "milestone", "acceptance", "specification"])) {
+      addUnique(signals, "delivery and acceptance criteria");
+    }
+    if (hasAny(contractText, ["terminate", "termination", "cancel", "cancellation"])) {
+      addUnique(signals, "termination rights");
+    }
+    if (hasAny(contractText, ["confidential", "nda", "disclosure"])) {
+      addUnique(signals, "confidentiality obligations");
+    }
+    if (hasAny(contractText, ["refund", "non-refundable", "refundable"])) {
+      addUnique(signals, "refund conditions");
     }
 
-    return signals.length ? [...new Set(signals)] : ["No strong clause signal detected yet"];
+    return signals.length ? signals : ["No strong clause signal detected yet"];
   }
 
-  function buildEvidenceGaps(data, groups) {
-    const combined = normalize(
-      [data.contractText, data.disputeDescription, data.evidence, data.metadata].join(" ")
-    );
-    const evidence = normalize(data.evidence);
-    const respondent = normalize(data.respondentPosition);
-    const dispute = normalize(data.disputeType);
+  function deriveActiveIssueTags(data, clauseSignals, triggers) {
+    const groups = detectGroups(data);
+    const tags = [];
+
+    if ((triggers.payment || triggers.invoiceDispute || triggers.refund) && (hasSignal(clauseSignals, "payment") || groups.includes("payment"))) {
+      addUnique(tags, "payment");
+    }
+    if (triggers.invoiceDispute && (hasSignal(clauseSignals, "disputed invoice") || hasSignal(clauseSignals, "payment") || groups.includes("payment"))) {
+      addUnique(tags, "invoice dispute");
+    }
+    if ((triggers.notice || triggers.suspension || triggers.termination) && (hasSignal(clauseSignals, "notice") || hasSignal(clauseSignals, "deemed receipt") || groups.includes("notice"))) {
+      addUnique(tags, "notice");
+    }
+    if ((triggers.cure || triggers.suspension || triggers.termination) && hasSignal(clauseSignals, "cure")) {
+      addUnique(tags, "cure period");
+    }
+    if (triggers.suspension && hasSignal(clauseSignals, "suspension")) {
+      addUnique(tags, "suspension");
+    }
+    if (triggers.termination && (hasSignal(clauseSignals, "termination") || groups.includes("termination"))) {
+      addUnique(tags, "termination");
+    }
+    if (triggers.delivery && (hasSignal(clauseSignals, "delivery") || groups.includes("delivery"))) {
+      addUnique(tags, "delivery");
+    }
+    if ((triggers.sla || triggers.service) && (hasSignal(clauseSignals, "SLA") || hasSignal(clauseSignals, "uptime") || groups.includes("service"))) {
+      addUnique(tags, "SLA");
+    }
+    if ((triggers.serviceCredit || triggers.sla) && hasSignal(clauseSignals, "service credit")) {
+      addUnique(tags, "service credit");
+    }
+    if (triggers.damages || triggers.refund || triggers.penalty) {
+      addUnique(tags, "damages");
+    }
+    if ((triggers.damages || triggers.liabilityLimitation) && (hasSignal(clauseSignals, "liability cap") || hasSignal(clauseSignals, "damages exclusion"))) {
+      addUnique(tags, "liability limitation");
+    }
+    if (triggers.indemnity && hasSignal(clauseSignals, "indemnity")) {
+      addUnique(tags, "indemnity");
+    }
+    if (triggers.penalty && hasAny(factText(data), ["penalty", "liquidated damages"])) {
+      addUnique(tags, "penalty/liquidated damages");
+    }
+    if (triggers.forceMajeure && hasSignal(clauseSignals, "force majeure")) {
+      addUnique(tags, "force majeure");
+    }
+    if (groups.includes("confidentiality")) {
+      addUnique(tags, "confidentiality");
+    }
+
+    return tags.length ? tags : ["unclear"];
+  }
+
+  function extractExplicitEvidenceGaps(evidenceText) {
     const gaps = [];
+    const lines = String(evidenceText || "").split(/\r?\n/);
+    let inMissingBlock = false;
 
-    if (!hasAny(combined, ["signed", "executed", "agreement", "purchase order"])) {
-      gaps.push("Missing signed agreement or executed contract copy");
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return;
+      }
+      const lower = normalize(trimmed);
+      if (/^available\b/.test(lower)) {
+        inMissingBlock = false;
+      }
+      if (lower.includes("missing or unclear") || lower.includes("missing/unclear")) {
+        inMissingBlock = true;
+        const after = trimmed.replace(/^.*missing(?:\s+or\s+unclear|\/unclear)\s*:?\s*/i, "");
+        if (after && normalize(after) !== lower) {
+          addUnique(gaps, cleanEvidenceGap(after));
+        }
+        return;
+      }
+      if (inMissingBlock || /\b(missing|unclear|not found|still being collected|incomplete|if any)\b/i.test(trimmed)) {
+        addUnique(gaps, cleanEvidenceGap(trimmed));
+      }
+    });
+
+    return gaps;
+  }
+
+  function cleanEvidenceGap(text) {
+    return String(text || "")
+      .replace(/^[*-]\s*/, "")
+      .replace(/^missing\s+/i, "")
+      .replace(/\.$/, "")
+      .trim();
+  }
+
+  function hasGap(gaps, words) {
+    return gaps.some((gap) => hasAny(gap, words));
+  }
+
+  function buildEvidenceGaps(data, activeIssueTags, clauseSignals, triggers) {
+    const combined = normalize(allText(data));
+    const evidence = normalize(data.evidence);
+    const gaps = extractExplicitEvidenceGaps(data.evidence);
+
+    if (!hasAny(combined, ["signed", "executed", "agreement", "purchase order", "order form"])) {
+      addUnique(gaps, "signed agreement or executed contract copy");
     }
-    if (groups.includes("payment") && !hasDateSignal(data.evidence + " " + data.metadata)) {
-      gaps.push("Missing invoice dates or payment due-date timeline");
+    if (hasTag(activeIssueTags, "payment") && !extractInvoiceDates(data).length) {
+      addUnique(gaps, "invoice dates or payment due-date timeline");
     }
-    if (groups.includes("payment") && !hasAny(evidence, ["receipt", "payment record", "bank", "ledger", "paid"])) {
-      gaps.push("Missing payment records or ledger proof");
+    if (hasTag(activeIssueTags, "payment") && hasAny(data.contractText, ["receipt", "receiving the invoice"]) && !hasAny(evidence, ["invoice receipt", "receipt date", "received on"])) {
+      addUnique(gaps, "invoice receipt dates");
     }
-    if ((groups.includes("notice") || groups.includes("termination") || groups.includes("service")) && !hasAny(combined, ["written notice", "breach notice", "notice date"])) {
-      gaps.push("Missing written notice record or notice date");
+    if (hasTag(activeIssueTags, "invoice dispute") && !hasAny(evidence, ["written invoice dispute", "dispute notice", "customer's written invoice dispute", "customer written invoice dispute"])) {
+      addUnique(gaps, "customer written invoice dispute notice");
     }
-    if (groups.includes("notice") && !hasAny(combined, ["cure period", "cure-period timeline", "cure date", "days later"])) {
-      gaps.push("Missing cure-period timeline");
+    if ((hasTag(activeIssueTags, "notice") || hasTag(activeIssueTags, "cure period") || hasTag(activeIssueTags, "suspension") || hasTag(activeIssueTags, "termination")) && !hasGap(gaps, ["notice address"]) && hasSignal(clauseSignals, "notice address") && !hasAny(evidence, ["notice address listed", "order form notice", "contractual notice address verified"])) {
+      addUnique(gaps, "contractual notice address");
     }
-    if (groups.includes("delivery") && !hasAny(evidence, ["delivery confirmation", "shipping receipt", "warehouse log", "acceptance note", "delivery proof"])) {
-      gaps.push("Missing delivery confirmation or acceptance record");
+    if ((hasTag(activeIssueTags, "notice") || hasTag(activeIssueTags, "cure period") || hasTag(activeIssueTags, "suspension") || hasTag(activeIssueTags, "termination")) && !hasGap(gaps, ["proof", "delivery"]) && !hasAny(evidence, ["proof of delivery", "delivery receipt", "sent to the contractual notice address", "email delivery log"])) {
+      addUnique(gaps, "proof of notice delivery");
     }
-    if (groups.includes("delivery") && !hasAny(data.contractText, ["acceptance", "specification", "criteria", "exhibit"])) {
-      gaps.push("Missing acceptance criteria or delivery specification");
+    if (hasTag(activeIssueTags, "cure period") && !hasAny(combined, ["cure deadline", "cure expired", "deemed received"])) {
+      addUnique(gaps, "clear cure deadline");
     }
-    if ((groups.includes("liability") || groups.includes("delivery") || dispute.includes("refund")) && !hasAny(combined, ["damages calculation", "replacement cost", "loss calculation", "itemized refund", "credit amount"])) {
-      gaps.push("Missing damages calculation or refund allocation");
+    if (hasTag(activeIssueTags, "payment") && !hasAny(combined, ["payment due", "due date", "within 30 days", "within 15 days", "within 10 days"])) {
+      addUnique(gaps, "clear payment due date");
     }
-    if (!hasAny(respondent, ["disputed", "object", "objection", "defense", "premature", "accepted", "outside its control"])) {
-      gaps.push("Missing respondent objection or defense record");
+    if (hasTag(activeIssueTags, "SLA") && !hasAny(evidence, ["independent monitoring", "timestamped sla", "timestamped monitoring", "third-party monitoring"])) {
+      addUnique(gaps, "independent or timestamped SLA monitoring data");
+    }
+    if ((hasTag(activeIssueTags, "damages") || hasTag(activeIssueTags, "liability limitation")) && !hasAny(evidence, ["damages calculation", "lost revenue calculation", "loss calculation", "replacement cost", "itemized refund"])) {
+      addUnique(gaps, "damages calculation or lost revenue calculation");
+    }
+    if (triggers.customerSideCause && !hasAny(evidence, ["integration error logs", "api authentication", "customer-side logs", "customer side logs"])) {
+      addUnique(gaps, "customer-side system or integration error logs");
     }
 
-    return gaps.length ? [...new Set(gaps)] : ["No obvious evidence gap detected from the current text"];
+    return gaps.length ? gaps : ["No obvious evidence gap detected from the current text"];
+  }
+
+  function extractTimelineFacts(data, activeIssueTags, clauseSignals, evidenceGaps) {
+    const facts = factText(data);
+    const contractText = data.contractText || "";
+    const invoiceDates = extractInvoiceDates(data);
+    const noticeDates = extractNoticeDates(data);
+    const actionDates = extractActionDates(data);
+    const servicePeriods = extractServicePeriods(data);
+    const paymentDeadline = findDurationNear(contractText, ["pay", "payment", "invoice", "fees"]);
+    const disputeDeadline = findDurationNear(contractText, ["disputes an invoice", "disputed amount", "basis for dispute"]);
+    const cureDuration = findDurationNear(contractText, ["cure"]);
+    const timeline = [];
+
+    if (invoiceDates.length) {
+      addUnique(timeline, `Invoice dates identified: ${formatList(invoiceDates)}.`);
+    }
+    if (paymentDeadline) {
+      addUnique(timeline, `Payment deadline signal: undisputed invoices due within ${paymentDeadline} of receipt or the contract trigger.`);
+    }
+    if (disputeDeadline) {
+      addUnique(timeline, `Invoice dispute deadline signal: written dispute notice due within ${disputeDeadline} of invoice receipt or discovery.`);
+    }
+    if (noticeDates.length) {
+      addUnique(timeline, `Notice date identified: ${formatList(noticeDates)}.`);
+    }
+    if (hasSignal(clauseSignals, "deemed receipt")) {
+      addUnique(timeline, "Deemed receipt rule identified: notices are deemed received on the next business day.");
+    }
+    if (cureDuration) {
+      addUnique(timeline, `Cure period length identified: ${cureDuration}.`);
+    }
+    if (actionDates.length) {
+      addUnique(timeline, `Suspension or termination action date identified: ${formatList(actionDates)}.`);
+    }
+    if (noticeDates.length && cureDuration && actionDates.length) {
+      addUnique(timeline, `Cure deadline must be calculated from deemed receipt of the ${noticeDates[0]} notice plus the ${cureDuration} cure period before the ${actionDates[0]} action.`);
+    }
+    if (servicePeriods.length && hasTag(activeIssueTags, "SLA")) {
+      addUnique(timeline, `Service-performance period identified for SLA review: ${formatList(servicePeriods)}.`);
+    }
+    if (hasGap(evidenceGaps, ["notice address", "proof of notice", "delivery", "cure deadline"])) {
+      addUnique(timeline, "Timeline verification remains evidence-dependent until notice address, delivery proof, and cure deadline evidence are matched.");
+    }
+    if (!timeline.length && hasDateSignal(facts + " " + contractText)) {
+      extractDates(facts + " " + contractText).forEach((date) => addUnique(timeline, `Date signal requiring classification: ${date}.`));
+    }
+
+    return timeline.length ? timeline : ["No dated timeline facts detected yet"];
+  }
+
+  function buildIssues(data, activeIssueTags, clauseSignals, timelineFacts, triggers) {
+    const issues = [];
+    const invoiceDates = extractInvoiceDates(data);
+    const invoiceLabel = invoiceDates.length ? `${formatList(invoiceDates)} invoices` : "identified invoices";
+    const noticeDates = extractNoticeDates(data);
+    const noticeDate = noticeDates[0] || "the non-payment notice";
+    const actionDates = extractActionDates(data);
+    const actionDate = actionDates[0] || "the suspension or termination date";
+    const servicePeriods = extractServicePeriods(data);
+    const servicePeriod = servicePeriods[0] || "the alleged service-impact period";
+    const paymentDeadline = findDurationNear(data.contractText, ["pay", "payment", "invoice", "fees"]);
+    const disputeDeadline = findDurationNear(data.contractText, ["disputes an invoice", "disputed amount", "basis for dispute"]);
+    const cureDuration = findDurationNear(data.contractText, ["cure"]);
+    const capPeriod = extractLiabilityCapPeriod(data.contractText);
+    const provider = partyName(data, "provider", "claimant");
+    const customer = partyName(data, "customer", "respondent");
+
+    if (hasTag(activeIssueTags, "payment")) {
+      const timing = paymentDeadline ? ` and overdue under the ${paymentDeadline} payment timing` : " and overdue";
+      addUnique(issues, `Whether the ${invoiceLabel} were unpaid${timing}, and properly preserved as undisputed amounts.`);
+    }
+    if (hasTag(activeIssueTags, "invoice dispute")) {
+      const deadline = disputeDeadline ? ` within ${disputeDeadline} of receiving each invoice` : " by the contractual invoice-dispute deadline";
+      addUnique(issues, `Whether the ${customer} sent a written invoice dispute notice${deadline}, identifying the disputed amount and basis for dispute.`);
+    }
+    if (hasTag(activeIssueTags, "notice")) {
+      addUnique(issues, `Whether the ${provider}'s ${noticeDate} notice was sent to the contractual notice address and can be proven with delivery evidence.`);
+    }
+    if (hasTag(activeIssueTags, "cure period")) {
+      const deemed = hasSignal(clauseSignals, "deemed receipt") ? " after next-business-day deemed receipt" : " after receipt";
+      const cure = cureDuration || "contractual";
+      addUnique(issues, `Whether the ${cure} cure period began${deemed} and expired before the ${actionDate} action.`);
+    }
+    if (hasTag(activeIssueTags, "suspension")) {
+      const scope = hasSignal(clauseSignals, "suspension") && hasAny(data.contractText, ["affected services", "commercially reasonable"])
+        ? " and was limited to affected services where commercially reasonable"
+        : "";
+      addUnique(issues, `Whether the ${actionDate} suspension was contractually authorized${scope}.`);
+    }
+    if (hasTag(activeIssueTags, "termination")) {
+      addUnique(issues, `Whether termination followed the required notice, cure, and effective-date process before access or work ended.`);
+    }
+    if (hasTag(activeIssueTags, "delivery")) {
+      const deliveryDates = findDatesNear(allText(data), ["delivery", "shipment", "milestone", "deadline"]);
+      addUnique(issues, `Whether the ${deliveryDates.length ? formatList(deliveryDates) + " delivery timeline" : "delivery and milestone timeline"} met the contract deadline and acceptance criteria.`);
+    }
+    if (hasTag(activeIssueTags, "SLA")) {
+      const cause = triggers.customerSideCause || hasSignal(clauseSignals, "customer-side")
+        ? " or was caused by customer-side systems or integration errors"
+        : "";
+      addUnique(issues, `Whether the alleged ${servicePeriod} downtime qualifies as an SLA/uptime failure${cause}.`);
+    }
+    if (hasTag(activeIssueTags, "service credit")) {
+      addUnique(issues, "Whether service credits are the exclusive remedy for any verified SLA failure.");
+    }
+    if (hasTag(activeIssueTags, "damages")) {
+      addUnique(issues, "Whether claimed lost revenue or other damages are supported by a calculation and barred by lost-profit or consequential damages exclusions.");
+    }
+    if (hasTag(activeIssueTags, "liability limitation")) {
+      const cap = capPeriod ? `fees paid in the prior ${capPeriod}` : "the contractual liability cap";
+      addUnique(issues, `Whether recovery is limited by the liability cap based on ${cap}.`);
+    }
+    if (hasTag(activeIssueTags, "force majeure")) {
+      addUnique(issues, "Whether a fact-triggered force majeure event actually prevented performance and was invoked with required notice and causation evidence.");
+    }
+    if (!issues.length) {
+      addUnique(issues, "Which contract obligation is actually disputed and which dated records prove or disprove it.");
+    }
+
+    return issues;
   }
 
   function buildNextSteps(data, diagnosis) {
-    const steps = [
-      "Build a dated timeline of contract, invoice, notice, cure period, delivery, acceptance, and dispute events",
-      "Attach source evidence to each key issue instead of relying on narrative summaries"
-    ];
+    const steps = [];
+    const tags = diagnosis.activeIssueTags || diagnosis.issueTags || [];
 
-    if (diagnosis.issueTags.includes("payment")) {
-      steps.push("Separate disputed and undisputed invoice amounts and map each to payment records");
+    if (hasTag(tags, "notice") || hasTag(tags, "cure period") || hasTag(tags, "suspension") || hasTag(tags, "termination")) {
+      addUnique(steps, "Reconstruct the invoice / notice / cure / suspension timeline with dates, deemed receipt, and action date.");
+      addUnique(steps, "Verify the contractual notice address from the order form or notice clause.");
+      addUnique(steps, "Verify proof of notice delivery, including whether the notice was sent to the required address.");
+      addUnique(steps, "Calculate deemed receipt and the cure deadline before assessing suspension or termination.");
     }
-    if (diagnosis.issueTags.includes("notice")) {
-      steps.push("Confirm whether the notice language, channel, and cure-period start date satisfy the contract");
+    if (hasTag(tags, "payment") || hasTag(tags, "invoice dispute")) {
+      addUnique(steps, "Collect invoice receipt dates for each invoice.");
+      addUnique(steps, "Collect any customer written invoice dispute notices and compare them to the contractual dispute deadline.");
+      addUnique(steps, "Separate disputed amounts from undisputed amounts and map both to payment records.");
     }
-    if (diagnosis.issueTags.includes("delivery")) {
-      steps.push("Compare delivery evidence against acceptance criteria and rejection windows");
+    if (hasTag(tags, "SLA") || hasTag(tags, "service credit")) {
+      addUnique(steps, "Compare support tickets, provider uptime reports, independent monitoring, and customer-side integration or error logs.");
+      addUnique(steps, "Determine whether any downtime is excluded by customer-side systems, maintenance, non-payment, or other service exclusions.");
+      addUnique(steps, "Review the service credit remedy for any verified SLA failure.");
     }
-    if (diagnosis.issueTags.includes("service")) {
-      steps.push("Review access logs, SLA incidents, service credits, and suspension authorization");
+    if (hasTag(tags, "damages") || hasTag(tags, "liability limitation")) {
+      addUnique(steps, "Review lost-profit, consequential damages, and other damages exclusions.");
+      addUnique(steps, "Review the liability cap and calculate the applicable fee period.");
+      addUnique(steps, "Verify the lost revenue or damages calculation against source records.");
+    }
+    if (!steps.length) {
+      addUnique(steps, "Build a dated timeline and attach source evidence to each issue before relying on the diagnosis.");
     }
     if (data.desiredOutcome) {
-      steps.push(`Frame the next report around the desired outcome: ${data.desiredOutcome}`);
+      addUnique(steps, `Frame the next report around the desired outcome: ${data.desiredOutcome}`);
     }
 
-    return steps.slice(0, data.diagnosisDepth === "Detailed" ? 6 : 5);
+    return data.diagnosisDepth === "Quick" ? steps.slice(0, 6) : steps;
   }
 
-  function riskSignal(data, groups, gaps, clauseSignals) {
-    const combined = [
-      data.contractText,
-      data.disputeDescription,
-      data.claimantPosition,
-      data.respondentPosition,
-      data.evidence
-    ].join(" ");
-    const severe =
-      groups.includes("termination") ||
-      groups.includes("liability") ||
-      (groups.includes("service") && normalize(combined).includes("suspension")) ||
-      normalize(data.disputeType).includes("refund");
+  function isCriticalEvidenceGap(gap) {
+    const text = normalize(gap);
+    return (
+      text.includes("notice address") ||
+      text.includes("proof of notice") ||
+      text.includes("proof that") ||
+      text.includes("notice delivery") ||
+      text.includes("invoice dispute notice") ||
+      text.includes("invoice receipt") ||
+      text.includes("cure deadline") ||
+      text.includes("payment due") ||
+      text.includes("sla monitoring") ||
+      text.includes("timestamped sla") ||
+      text.includes("damages calculation") ||
+      text.includes("lost revenue calculation") ||
+      text.includes("disputed amounts")
+    );
+  }
+
+  function isProceduralEvidenceGap(gap) {
+    const text = normalize(gap);
+    return text.includes("notice address") || text.includes("notice delivery") || text.includes("proof of notice") || text.includes("cure deadline") || text.includes("deemed receipt");
+  }
+
+  function scoreRisk(data, activeIssueTags, evidenceGaps, timelineFacts, triggers) {
+    const combined = allText(data);
+    const nonPlaceholderGaps = evidenceGaps.filter((gap) => !normalize(gap).startsWith("no obvious"));
+    const criticalGaps = nonPlaceholderGaps.filter(isCriticalEvidenceGap);
+    const proceduralGap = criticalGaps.some(isProceduralEvidenceGap);
+    const proceduralIssue =
+      hasTag(activeIssueTags, "notice") ||
+      hasTag(activeIssueTags, "cure period") ||
+      hasTag(activeIssueTags, "suspension") ||
+      hasTag(activeIssueTags, "termination");
+    const severeIssue =
+      hasTag(activeIssueTags, "suspension") ||
+      hasTag(activeIssueTags, "termination") ||
+      hasTag(activeIssueTags, "damages") ||
+      hasTag(activeIssueTags, "liability limitation");
     const evidenceScore = countGroup(data.evidence, "evidence");
     const timelineScore = dateSignalCount(combined);
-    const weakEvidence = evidenceScore < 2;
-    const missingNoticeOrTimeline = gaps.some((gap) =>
-      /notice|cure|timeline|date/i.test(gap)
-    );
-    const strongEvidence = evidenceScore >= 3 && timelineScore >= 2;
+    const rationale = [];
+    let level = "unclear";
+
+    if (activeIssueTags.length && !hasTag(activeIssueTags, "unclear")) {
+      rationale.push(`Active issues detected: ${activeIssueTags.join(", ")}.`);
+    }
+    if (criticalGaps.length) {
+      rationale.push(`Critical evidence gaps affect core elements: ${criticalGaps.join("; ")}.`);
+    }
+    if (proceduralIssue && proceduralGap) {
+      rationale.push("Notice, cure, suspension, or termination depends on missing procedural proof, so risk cannot be low.");
+    }
+    if (triggers.contested) {
+      rationale.push("Party positions dispute core facts or causation.");
+    }
+    if (hasTag(activeIssueTags, "liability limitation")) {
+      rationale.push("Requested remedies may exceed service-credit, damages-exclusion, or liability-cap limits.");
+    }
 
     if (combined.trim().length < 140) {
-      return "unclear";
+      level = "unclear";
+      rationale.push("Input is too short for a reliable deterministic risk label.");
+    } else if (severeIssue && criticalGaps.length >= 6 && triggers.contested) {
+      level = "high";
+    } else if ((proceduralIssue && proceduralGap) || criticalGaps.length >= 2 || (severeIssue && triggers.contested)) {
+      level = "medium";
+    } else if (activeIssueTags.length && evidenceScore >= 3 && timelineScore >= 2 && nonPlaceholderGaps.length <= 1) {
+      level = "low";
+    } else if (activeIssueTags.length || nonPlaceholderGaps.length) {
+      level = "medium";
     }
-    if (severe && weakEvidence && missingNoticeOrTimeline) {
-      return "high";
-    }
-    if (
-      normalize(data.riskMode).includes("conservative") &&
-      severe &&
-      missingNoticeOrTimeline &&
-      gaps.length >= 3
-    ) {
-      return "high";
-    }
-    if (clauseSignals.length >= 2 && strongEvidence && gaps.length <= 2) {
-      return "low";
-    }
-    if (groups.length || evidenceScore || gaps.length) {
-      return "medium";
-    }
-    return "unclear";
+
+    return {
+      level,
+      rationale: rationale.length ? rationale : ["Risk remains unclear because the input lacks enough classified facts."],
+      critical_evidence_gaps: criticalGaps,
+      evidence_dependent: criticalGaps.length > 0
+    };
   }
 
   function contestedFacts(data) {
@@ -407,6 +981,12 @@
     if (respondent.includes("notice") || claimant.includes("notice")) {
       facts.push("Whether notice was sent in the required form and started the cure period");
     }
+    if (respondent.includes("downtime") || claimant.includes("downtime") || respondent.includes("sla") || claimant.includes("sla")) {
+      facts.push("Whether service downtime was provider-side, customer-side, or otherwise excluded");
+    }
+    if (respondent.includes("lost revenue") || claimant.includes("lost revenue") || respondent.includes("damages") || claimant.includes("damages")) {
+      facts.push("Whether claimed damages are recoverable after service-credit, damages-exclusion, and liability-cap terms");
+    }
     if (respondent.includes("accepted") || claimant.includes("accepted")) {
       facts.push("Whether work or goods were accepted before the dispute escalated");
     }
@@ -418,25 +998,32 @@
   }
 
   function diagnose(data) {
-    const groups = detectGroups(data);
-    const issueTags = groups.filter((group) => group !== "evidence");
-    const keyIssues = buildIssues(data, groups);
-    const relevantClauseSignals = buildClauseSignals(data, groups);
-    const evidenceGaps = buildEvidenceGaps(data, groups);
-    const risk = riskSignal(data, groups, evidenceGaps, relevantClauseSignals);
+    const triggers = extractFactualTriggers(data);
+    const relevantClauseSignals = buildClauseSignals(data);
+    const activeIssueTags = deriveActiveIssueTags(data, relevantClauseSignals, triggers);
+    const evidenceGaps = buildEvidenceGaps(data, activeIssueTags, relevantClauseSignals, triggers);
+    const timelineFacts = extractTimelineFacts(data, activeIssueTags, relevantClauseSignals, evidenceGaps);
+    const risk = scoreRisk(data, activeIssueTags, evidenceGaps, timelineFacts, triggers);
+    const keyIssues = buildIssues(data, activeIssueTags, relevantClauseSignals, timelineFacts, triggers);
+    const detectedDisputeTypes = detectDisputeTypes(data, activeIssueTags, triggers);
 
     const diagnosis = {
-      case_type: normalize(data.disputeType || "other").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "other",
-      contract_type: data.contractType,
-      dispute_type: data.disputeType,
+      case_type: normalize(detectedDisputeTypes[0] || data.disputeType || "other").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "other",
+      contract_type: detectContractTypes(data).join("; "),
+      dispute_type: detectedDisputeTypes.join("; "),
+      dispute_types: detectedDisputeTypes,
       diagnosis_depth: data.diagnosisDepth,
       output_format_preference: data.outputFormat,
       risk_mode: data.riskMode,
-      risk_signal: risk,
-      issue_tags: issueTags.length ? issueTags : ["unclear"],
+      risk_signal: risk.level,
+      risk,
+      active_issue_tags: activeIssueTags,
+      issue_tags: activeIssueTags,
       dispute_summary: summarize(data),
       key_issues: keyIssues,
+      clause_signals: relevantClauseSignals,
       relevant_clause_signals: relevantClauseSignals,
+      timeline_facts: timelineFacts,
       position_matrix: {
         claimant: data.claimantPosition || "No claimant position provided.",
         respondent: data.respondentPosition || "No respondent position provided.",
@@ -447,10 +1034,52 @@
     };
 
     diagnosis.suggested_next_steps = buildNextSteps(data, {
-      issueTags: diagnosis.issue_tags
+      activeIssueTags: diagnosis.active_issue_tags
     });
 
     return diagnosis;
+  }
+
+  function detectContractTypes(data) {
+    const types = [];
+    if (data.contractType) {
+      addUnique(types, data.contractType);
+    }
+    if (hasAny(data.contractText + " " + data.disputeDescription, ["saas", "platform", "subscription", "sla", "uptime"]) && !types.some((type) => normalize(type).includes("saas"))) {
+      addUnique(types, "SaaS Agreement");
+    }
+    return types.length ? types : ["Other"];
+  }
+
+  function detectDisputeTypes(data, activeIssueTags, triggers) {
+    const types = [];
+    if (data.disputeType && normalize(data.disputeType) !== "other") {
+      addUnique(types, data.disputeType);
+    }
+    if (hasTag(activeIssueTags, "notice") || hasTag(activeIssueTags, "cure period")) {
+      addUnique(types, "Notice/Cure Period");
+    }
+    if (hasTag(activeIssueTags, "payment") && hasTag(activeIssueTags, "suspension")) {
+      addUnique(types, "Payment/Suspension");
+    } else if (hasTag(activeIssueTags, "payment") || hasTag(activeIssueTags, "invoice dispute")) {
+      addUnique(types, "Payment/Invoice Dispute");
+    }
+    if (hasTag(activeIssueTags, "SLA") || hasTag(activeIssueTags, "service credit")) {
+      addUnique(types, "SLA/Service Credit");
+    }
+    if (hasTag(activeIssueTags, "damages") || hasTag(activeIssueTags, "liability limitation")) {
+      addUnique(types, "Damages/Liability");
+    }
+    if (triggers.termination || hasTag(activeIssueTags, "termination")) {
+      addUnique(types, "Termination");
+    }
+    if (triggers.delivery || hasTag(activeIssueTags, "delivery")) {
+      addUnique(types, "Delivery/Acceptance");
+    }
+    if (triggers.refund) {
+      addUnique(types, "Refund");
+    }
+    return types.length ? types : ["Other"];
   }
 
   function summarize(data) {
@@ -473,15 +1102,25 @@
       "## Dispute Summary",
       diagnosis.dispute_summary,
       "",
+      "## Active Issue Tags",
+      ...diagnosis.active_issue_tags.map((tag) => `- ${tag}`),
+      "",
       "## Key Issues",
       ...diagnosis.key_issues.map((issue) => `- ${issue}`),
       "",
-      "## Relevant Clauses or Clause Signals",
-      ...diagnosis.relevant_clause_signals.map((signal) => `- ${signal}`),
+      "## Clause Signals",
+      ...diagnosis.clause_signals.map((signal) => `- ${signal}`),
+      "",
+      "## Timeline Facts",
+      ...diagnosis.timeline_facts.map((fact) => `- ${fact}`),
       "",
       "## Claimant vs Respondent",
       `- Claimant: ${diagnosis.position_matrix.claimant}`,
       `- Respondent: ${diagnosis.position_matrix.respondent}`,
+      `- Contested facts: ${diagnosis.position_matrix.contested_facts.join("; ")}`,
+      "",
+      "## Risk Rationale",
+      ...diagnosis.risk.rationale.map((reason) => `- ${reason}`),
       "",
       "## Evidence Gaps",
       ...diagnosis.evidence_gaps.map((gap) => `- ${gap}`),
@@ -497,8 +1136,12 @@
       detected: {
         contract_type: diagnosis.contract_type,
         dispute_type: diagnosis.dispute_type,
-        issue_tags: diagnosis.issue_tags
+        active_issue_tags: diagnosis.active_issue_tags,
+        clause_signals: diagnosis.clause_signals
       },
+      timeline_facts: diagnosis.timeline_facts,
+      evidence_gaps: diagnosis.evidence_gaps,
+      risk: diagnosis.risk,
       risk_signal: diagnosis.risk_signal,
       report_outputs: ["markdown", "json-style"]
     };
@@ -689,13 +1332,14 @@
       `<section class="result-block"><h4>Detected contract/dispute type</h4>${tagsHtml([
         diagnosis.contract_type,
         diagnosis.dispute_type,
-        ...diagnosis.issue_tags
+        ...diagnosis.active_issue_tags
       ])}</section>`,
       `<section class="result-block"><h4>Key issues</h4>${listHtml(diagnosis.key_issues, "issue-list")}</section>`,
-      `<section class="result-block"><h4>Relevant clauses or clause signals</h4>${listHtml(diagnosis.relevant_clause_signals, "issue-list")}</section>`,
+      `<section class="result-block"><h4>Relevant clauses or clause signals</h4>${listHtml(diagnosis.clause_signals, "issue-list")}</section>`,
+      `<section class="result-block"><h4>Timeline facts</h4>${listHtml(diagnosis.timeline_facts, "issue-list")}</section>`,
       `<section class="result-block"><h4>Claimant vs respondent position matrix</h4><div class="matrix"><div><strong>Claimant</strong><p>${escapeHtml(diagnosis.position_matrix.claimant)}</p></div><div><strong>Respondent</strong><p>${escapeHtml(diagnosis.position_matrix.respondent)}</p></div></div><p><strong>Contested facts:</strong> ${escapeHtml(diagnosis.position_matrix.contested_facts.join("; "))}</p></section>`,
       `<section class="result-block"><h4>Evidence gaps</h4>${listHtml(diagnosis.evidence_gaps, "gap-list")}</section>`,
-      `<section class="result-block"><h4>Risk signal</h4><p>${escapeHtml(diagnosis.risk_signal)} risk under ${escapeHtml(diagnosis.risk_mode)} mode.</p></section>`,
+      `<section class="result-block"><h4>Risk signal</h4><p>${escapeHtml(diagnosis.risk_signal)} risk under ${escapeHtml(diagnosis.risk_mode)} mode.</p>${listHtml(diagnosis.risk.rationale, "gap-list")}</section>`,
       `<section class="result-block"><h4>Suggested next steps</h4>${listHtml(diagnosis.suggested_next_steps, "next-step-list")}</section>`,
       `<section class="result-block"><h4>Structured diagnosis preview</h4><pre class="preview-code"><code>${escapeHtml(JSON.stringify(structuredPreview(diagnosis), null, 2))}</code></pre></section>`,
       `<section class="result-block"><h4>Markdown-style report preview</h4><pre class="preview-code"><code>${escapeHtml(latestMarkdown)}</code></pre></section>`,
@@ -754,6 +1398,15 @@
     } catch (error) {
       copyStatus.textContent = `Copy failed. Select the ${labels[kind] || kind} preview manually.`;
     }
+  }
+
+  if (typeof window !== "undefined") {
+    window.Contract2AgentPlayground = {
+      analyzeDispute,
+      diagnose,
+      markdownReport,
+      structuredPreview
+    };
   }
 
   form.addEventListener("submit", (event) => {

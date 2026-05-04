@@ -1,5 +1,93 @@
 # Contract2Agent Bug Audit
 
+## 2026-05-04 Playground Diagnosis Quality Fix
+
+### 1. What was wrong
+
+- The GitHub Pages playground diagnosis in `docs/assets/app.js` mixed contract clause mentions with active dispute issues.
+- Force majeure could become an active issue merely because it appeared as an SLA exclusion.
+- Key issues were generated from broad taxonomy-style templates instead of the case facts, dates, party positions, and evidence gaps.
+- Risk scoring could be too optimistic because it treated a case with multiple critical notice/cure evidence gaps as low when the rest of the text looked well populated.
+- Timeline reasoning did not separately classify invoice dates, notice dates, deemed receipt, cure period, suspension date, or evidence-dependent procedural prerequisites.
+
+### 2. Root cause
+
+- The browser analyzer used one keyword-group pass over contract text, facts, evidence, and metadata.
+- The same detected groups fed active issue tags, key issues, clause signals, evidence gaps, and risk.
+- There were no negative-trigger rules for clause-only concepts such as force majeure.
+- Evidence gaps were mostly generic and were not tied back to core procedural prerequisites before risk scoring.
+
+### 3. Files changed
+
+- `docs/assets/app.js`
+  - Added deterministic separation for:
+    - contract type detection
+    - dispute type detection
+    - active issue tags
+    - clause signals
+    - evidence gaps
+    - timeline facts
+    - risk object and risk label
+    - suggested next steps
+  - Preserved the existing static browser playground and existing aliases such as `issue_tags`, `relevant_clause_signals`, and `risk_signal`.
+  - Added force majeure negative-trigger behavior: force majeure remains a clause signal when only present in an SLA exclusion, but becomes active only when dispute facts or party positions invoke an external event or force majeure theory.
+  - Updated Markdown and JSON output to include the corrected structured diagnosis fields.
+- `tests/test_docs_site.py`
+  - Added Node-backed tests that execute the actual static `docs/assets/app.js` diagnosis code with a minimal DOM stub.
+  - Added regression coverage for force majeure negative triggers, critical evidence gaps, case-specific key issues, output structure separation, Markdown/JSON exports, and the MkDocs playground route.
+
+### 4. Tests added or updated
+
+- `test_playground_force_majeure_clause_signal_is_not_active_issue`
+- `test_playground_notice_cure_critical_gaps_prevent_low_risk`
+- `test_playground_saas_key_issues_are_case_specific`
+- `test_playground_structured_output_separates_core_fields`
+- `test_playground_exports_use_corrected_structured_diagnosis`
+- `test_mkdocs_nav_preserves_github_pages_playground_route`
+
+### 5. Commands run
+
+| Command | Result | Summary |
+| --- | --- | --- |
+| `rg --files` | Passed | Inspected repository structure and located the static playground assets. |
+| `rg -n "function diagnose\|function markdownReport\|force majeure\|risk" docs contract2agent tests` | Passed | Located the active diagnosis/export implementation in `docs/assets/app.js`. |
+| `node --check docs\assets\app.js` | Passed | Browser playground JavaScript syntax is valid. |
+| `python -m pytest tests\test_docs_site.py` | Passed | 18 passed in 0.47s on the final targeted run. |
+| `python -m pytest` | Passed | 231 passed in 23.31s on the final full run. |
+| `python -m compileall -q contract2agent tests scripts` | Passed | Python syntax compilation succeeded. |
+| `python scripts\check_docs_links.py` | Passed | Checked 26 Markdown files; all relative links resolve. |
+| `python -m mkdocs build --strict` | Passed | Documentation built successfully. |
+| `Test-Path site\playground\index.html` | Passed | Built playground page exists. This preserves the GitHub Pages route that maps to `/Contract2Agent/playground/`. |
+| `Test-Path package.json` | Passed | Returned `False`; no npm scripts are present, so `npm test`, `npm run build`, `npm run lint`, and `npm run typecheck` were not applicable. |
+
+### 6. Build and test results
+
+- Playground static build succeeds.
+- `site/playground/index.html` is produced by MkDocs.
+- The MkDocs nav still includes `Playground: playground/index.html`.
+- The static app still contains no runtime `fetch`, `XMLHttpRequest`, `WebSocket`, or dynamic browser import calls.
+- The SaaS regression fixture now produces:
+  - `contract_type`: includes `SaaS Agreement`
+  - `dispute_type`: includes `Notice/Cure Period` and `Payment/Suspension`
+  - `active_issue_tags`: includes payment, invoice dispute, notice, cure period, suspension, SLA, service credit, damages, and liability limitation
+  - `active_issue_tags`: does not include force majeure
+  - `clause_signals`: includes force majeure as an exclusion signal
+  - `risk_signal`: `medium`, not low
+  - case-specific key issues containing February 1, March 1, March 5, March 18, 10-day cure period, SLA/downtime, service credits, lost revenue, and liability cap concepts
+
+### 7. Remaining limitations
+
+- This remains a deterministic static playground, not legal advice and not an exhaustive legal analyzer.
+- Date math is classified and explained, but exact business-day calendar calculation is not performed in the browser.
+- Risk scoring is conservative around critical evidence gaps but still heuristic.
+- The analyzer does not infer facts that are not present in contract text, dispute facts, party positions, evidence, or metadata.
+
+### 8. Reference pack decision
+
+- A static reference pack was deferred.
+- The fix uses curated deterministic phrase maps and negative triggers directly in `docs/assets/app.js`, which keeps the GitHub Pages playground offline, static, and backend-free.
+- No runtime browser scraping, external API dependency, CORS proxy, or network call was added.
+
 ## 1. Audit Summary
 
 - Audit timestamp: 2026-05-04T17:07:04+08:00
@@ -92,4 +180,3 @@ No new confirmed implementation bugs were found during this pass.
 - Commands that could not be run successfully:
   - `python -m pip install -e .`: blocked by local pip temp permission errors.
   - `c2a --help`: blocked because editable install could not complete and the script is not on PATH.
-
