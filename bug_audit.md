@@ -1,5 +1,62 @@
 # Contract2Agent Bug Audit
 
+## 2026-05-04 Playground Delivery Follow-Up Fix
+
+### 1. Previous partial fix result
+
+- The first playground diagnosis-quality fix separated the main structured fields and made the SaaS notice/cure fixture risk non-low.
+- It still left a visible late-delivery failure mode:
+  - explicit denial of external-event causation could still activate force majeure because the same sentence contained trigger words such as natural disaster, government order, strike, war, and external uncontrollable event.
+  - late-delivery key issues still fell back to broad delivery/liability templates when enough dated delivery, cure, rejection, defect, and damages facts were available.
+  - the result header still combined contract/dispute type badges with active issue tags, making the conceptual separation less visible.
+
+### 2. Remaining bug and root cause
+
+- Root cause:
+  - force majeure trigger detection looked for positive trigger phrases before understanding sentence-level denial context.
+  - delivery-specific dates and remedy terms were not extracted into a delivery timeline shape before key issue generation.
+  - the rendered detected badge list grouped type labels and active issue tags together.
+- Corrected behavior:
+  - active force majeure now requires factual invocation and is blocked when the facts explicitly deny force majeure or external uncontrollable event causation.
+  - clause-only force majeure remains available as `force majeure clause mentioned but not fact-triggered`.
+  - late-delivery key issues now use extracted delivery milestone, actual delivery, notice, cure, revised package, rejection, review-period, API defect, liquidated-damages, lost-revenue, and liability-cap facts when present.
+
+### 3. Files changed
+
+- `docs/assets/app.js`
+  - Added sentence-level external-event denial detection for force majeure.
+  - Added delivery timeline extraction helpers for milestone, delivery, delay notice, revised package, rejection, review period, liquidated damages cap, API mapping defects, lost revenue exclusion, and liability cap period.
+  - Updated delivery/notice/cure/damages/liability key issue generation to prefer fact-specific issues.
+  - Split the rendered detected type badges from active issue tags so clause-only signals do not appear in the active tag list.
+- `tests/test_docs_site.py`
+  - Added a late-delivery regression fixture with the explicit negative force-majeure context.
+  - Added tests for active issue tags, clause signals, fact-specific key issues, and Markdown/JSON export separation.
+- `bug_audit.md`
+  - Added this follow-up note.
+
+### 4. Tests added
+
+- `test_playground_late_delivery_blocks_denied_force_majeure_issue`
+- `test_playground_late_delivery_key_issues_are_fact_specific`
+- `test_playground_late_delivery_exports_keep_force_majeure_clause_only`
+
+### 5. Commands run
+
+| Command | Result | Summary |
+| --- | --- | --- |
+| `node --check docs\assets\app.js` | Passed | Static playground JavaScript syntax is valid. |
+| `python -m pytest tests\test_docs_site.py -q` | Passed | 21 passed in 0.78s. |
+| `python -m pytest` | Passed | 234 passed in 21.43s. |
+| `python -m compileall -q contract2agent tests scripts` | Passed | Python syntax compilation succeeded. |
+| `python scripts\check_docs_links.py` | Passed | Checked 26 Markdown files; all relative links resolve. |
+| `python -m mkdocs build --strict` | Passed | Documentation built successfully in 0.55s. |
+
+### 6. Build/test result
+
+- The static playground still builds through MkDocs.
+- No backend, runtime network call, route, sample-loading, export-button, or styling change was added.
+- The late-delivery fixture now keeps force majeure out of `active_issue_tags`, retains it only in `clause_signals`, and exports the corrected separation in Markdown and JSON.
+
 ## 2026-05-04 Playground Diagnosis Quality Fix
 
 ### 1. What was wrong
@@ -71,7 +128,7 @@
   - `dispute_type`: includes `Notice/Cure Period` and `Payment/Suspension`
   - `active_issue_tags`: includes payment, invoice dispute, notice, cure period, suspension, SLA, service credit, damages, and liability limitation
   - `active_issue_tags`: does not include force majeure
-  - `clause_signals`: includes force majeure as an exclusion signal
+  - `clause_signals`: includes force majeure as a not fact-triggered clause signal
   - `risk_signal`: `medium`, not low
   - case-specific key issues containing February 1, March 1, March 5, March 18, 10-day cure period, SLA/downtime, service credits, lost revenue, and liability cap concepts
 

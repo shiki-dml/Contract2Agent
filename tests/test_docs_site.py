@@ -80,6 +80,61 @@ SAAS_NOTICE_CURE_FIXTURE = {
 }
 
 
+LATE_DELIVERY_FORCE_MAJEURE_NEGATIVE_FIXTURE = {
+    "contractType": "Sales Contract",
+    "disputeType": "Late Delivery",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Evidence-first",
+    "desiredOutcome": "Assess rejection rights, cure timing, and damages limits.",
+    "contractText": (
+        "Seller must deliver a production-ready integration package by April 1. "
+        "If delivery is late, Buyer may send a Delivery Delay Notice to the contractual "
+        "notice contacts, and Seller has a 10-day cure period. Buyer must review the "
+        "delivery or any revised package within a 5-business-day review period. "
+        "Liquidated damages for late delivery must be calculated from proven delay "
+        "days and are capped at 10% of project fees. Lost revenue is excluded, and "
+        "total liability is capped at fees paid during the six months before the claim. "
+        "Force majeure excuses delay caused by natural disaster, government order, "
+        "strike, war, or other external uncontrollable event."
+    ),
+    "disputeDescription": (
+        "The April 1 production-ready delivery milestone was missed when Seller delivered "
+        "on April 8. Buyer sent an April 9 Delivery Delay Notice to the project notice "
+        "contacts. Seller provided a revised package on April 17, and Buyer rejected it "
+        "on April 23 because API mapping defects still blocked launch. No party claims "
+        "that a natural disaster, government order, strike, war, or other external "
+        "uncontrollable event caused the delay."
+    ),
+    "claimantPosition": (
+        "Buyer says the April 8 delivery was late, the April 9 Delivery Delay Notice "
+        "started the 10-day cure period, and the April 17 revised package still had API "
+        "mapping defects. Buyer seeks liquidated damages and lost revenue."
+    ),
+    "respondentPosition": (
+        "Seller says the April 17 revised package cured the issues and Buyer waited too "
+        "long to reject on April 23 under the 5-business-day review period. Seller also "
+        "invokes the 10% liquidated damages cap, lost revenue exclusion, and six-month "
+        "fee liability cap."
+    ),
+    "evidence": (
+        "Available:\n"
+        "- Project schedule showing April 1 production-ready milestone\n"
+        "- Delivery log dated April 8\n"
+        "- April 9 Delivery Delay Notice\n"
+        "- Contractual notice contact list\n"
+        "- Revised package changelog dated April 17\n"
+        "- April 23 rejection email\n"
+        "- API mapping defect tickets\n"
+        "- Liquidated damages spreadsheet\n\n"
+        "Missing or unclear:\n"
+        "- Proof that April 9 notice reached all contractual notice contacts\n"
+        "- Final liquidated damages calculation"
+    ),
+    "metadata": '{"delivery_type":"integration package"}',
+}
+
+
 def test_github_pages_entrypoint_references_existing_static_assets() -> None:
     demo_html = ROOT / "docs" / "playground" / "index.html"
     html = demo_html.read_text(encoding="utf-8")
@@ -292,6 +347,74 @@ def test_playground_exports_use_corrected_structured_diagnosis() -> None:
     assert "force majeure" not in active_section.lower()
     assert "## Clause Signals" in markdown
     assert "## Timeline Facts" in markdown
+
+
+def test_playground_late_delivery_blocks_denied_force_majeure_issue() -> None:
+    diagnosis = _run_playground_diagnosis(
+        LATE_DELIVERY_FORCE_MAJEURE_NEGATIVE_FIXTURE
+    )["diagnosis"]
+
+    assert all(
+        "force majeure" not in tag.lower()
+        for tag in diagnosis["active_issue_tags"]
+    )
+    assert any(
+        signal == "force majeure clause mentioned but not fact-triggered"
+        for signal in diagnosis["clause_signals"]
+    )
+
+
+def test_playground_late_delivery_key_issues_are_fact_specific() -> None:
+    diagnosis = _run_playground_diagnosis(
+        LATE_DELIVERY_FORCE_MAJEURE_NEGATIVE_FIXTURE
+    )["diagnosis"]
+    key_issue_text = "\n".join(diagnosis["key_issues"])
+
+    for required in (
+        "April 1 production-ready delivery milestone",
+        "April 8",
+        "April 9 Delivery Delay Notice",
+        "contractual notice contacts",
+        "10-day cure period",
+        "April 17 revised package",
+        "April 23 rejection",
+        "5-business-day review period",
+        "API mapping defects",
+        "liquidated damages calculation",
+        "10% cap",
+        "lost revenue exclusion",
+        "six-month fee liability cap",
+    ):
+        assert required in key_issue_text
+
+    assert (
+        "Whether uncontrollable events or force majeure excuses performance"
+        not in key_issue_text
+    )
+    assert "fact-triggered force majeure event" not in key_issue_text
+
+
+def test_playground_late_delivery_exports_keep_force_majeure_clause_only() -> None:
+    output = _run_playground_diagnosis(
+        LATE_DELIVERY_FORCE_MAJEURE_NEGATIVE_FIXTURE
+    )
+    exported = json.loads(output["json"])
+    markdown = output["markdown"]
+    active_section = markdown.split("## Active Issue Tags", 1)[1].split(
+        "## Key Issues", 1
+    )[0]
+
+    assert all(
+        "force majeure" not in tag.lower()
+        for tag in exported["active_issue_tags"]
+    )
+    assert "force majeure" not in active_section.lower()
+    assert "force majeure clause mentioned but not fact-triggered" in exported[
+        "clause_signals"
+    ]
+    assert "force majeure clause mentioned but not fact-triggered" in markdown
+    assert "timeline_facts" in exported
+    assert "risk" in exported
 
 
 def test_mkdocs_nav_preserves_github_pages_playground_route() -> None:
