@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from contract2agent import cli as cli_module
 from contract2agent.patch_preview import PatchPreviewOptions, run_patch_preview
 from contract2agent.patch_preview.models import PatchProposal, to_plain_data
 
@@ -38,7 +40,7 @@ def test_patch_proposal_model_serializes_to_json() -> None:
         baseline_impact={"baseline_exists": False},
         risk_level="medium",
         requires_approval=True,
-        auto_apply_eligible=True,
+        auto_apply_eligible=False,
         do_not_apply_automatically=True,
         rollback_available=False,
         rollback_plan="Revert the diff.",
@@ -51,7 +53,7 @@ def test_patch_proposal_model_serializes_to_json() -> None:
 
 def test_patch_preview_cli_command_exists() -> None:
     root = _project("cli")
-    _write(root / "prompt.md", "You are helpful.")
+    _write(root / "prompts" / "system.md", "You are helpful.")
     run_path = _write_run(
         root,
         [{"id": "f1", "failure_type": "OUTPUT_SCHEMA_ERROR", "description": "Invalid JSON."}],
@@ -91,7 +93,7 @@ def test_empty_findings_do_not_crash() -> None:
 
 def test_output_schema_error_generates_prompt_patch() -> None:
     root = _project("schema")
-    _write(root / "prompt.md", "Return the answer.")
+    _write(root / "prompts" / "system.md", "Return the answer.")
     run_path = _write_run(
         root,
         [
@@ -106,15 +108,38 @@ def test_output_schema_error_generates_prompt_patch() -> None:
     proposal = _preview(root, run_path).proposals[0]
 
     assert proposal.patch_type == "prompt_update"
-    assert proposal.files_changed == ["prompt.md"]
+    assert proposal.files_changed == ["prompts/system.md"]
     assert "Return only valid JSON" in proposal.diff
     assert "output_schema" in proposal.validation_tags
     assert "regression" in proposal.validation_tags
 
 
+def test_patch_preview_reviewer_notes_match_current_cli_capabilities() -> None:
+    root = _project("reviewer_notes_cli_capabilities")
+    _write(root / "prompts" / "system.md", "Return the answer.")
+    run_path = _write_run(
+        root,
+        [
+            {
+                "id": "schema_1",
+                "failure_type": "OUTPUT_SCHEMA_ERROR",
+                "description": "The agent produced invalid JSON.",
+            }
+        ],
+    )
+
+    proposal = _preview(root, run_path).proposals[0]
+    notes = "\n".join(proposal.reviewer_notes)
+
+    assert "--focus or --compare-baseline" not in notes
+    assert "does not yet support" not in notes
+    assert "agentdoctor deep --focus" in notes
+    assert "--compare-baseline latest" in notes
+
+
 def test_output_format_error_generates_template_patch() -> None:
     root = _project("format")
-    _write(root / "prompt.md", "Answer clearly.")
+    _write(root / "prompts" / "system.md", "Answer clearly.")
     run_path = _write_run(
         root,
         [{"id": "format_1", "failure_type": "OUTPUT_FORMAT_ERROR", "description": "Missing Markdown sections."}],
@@ -129,7 +154,7 @@ def test_output_format_error_generates_template_patch() -> None:
 
 def test_tool_missing_read_only_tool_generates_trigger_patch() -> None:
     root = _project("tool_read")
-    _write(root / "prompt.md", "Summarize documents.")
+    _write(root / "prompts" / "system.md", "Summarize documents.")
     run_path = _write_run(
         root,
         [
@@ -145,13 +170,14 @@ def test_tool_missing_read_only_tool_generates_trigger_patch() -> None:
     proposal = _preview(root, run_path).proposals[0]
 
     assert "document_reader" in proposal.diff
-    assert proposal.auto_apply_eligible
+    assert not proposal.auto_apply_eligible
+    assert proposal.do_not_apply_automatically
     assert "tool_use" in proposal.validation_tags
 
 
 def test_tool_missing_side_effect_tool_requires_approval() -> None:
     root = _project("tool_side_effect")
-    _write(root / "prompt.md", "Send updates.")
+    _write(root / "prompts" / "system.md", "Send updates.")
     run_path = _write_run(
         root,
         [
@@ -173,7 +199,7 @@ def test_tool_missing_side_effect_tool_requires_approval() -> None:
 
 def test_hallucination_risk_generates_source_grounding_patch() -> None:
     root = _project("hallucination")
-    _write(root / "prompt.md", "Answer from documents.")
+    _write(root / "prompts" / "system.md", "Answer from documents.")
     run_path = _write_run(
         root,
         [{"id": "h1", "failure_type": "HALLUCINATION_RISK", "description": "The answer guessed facts without evidence."}],
@@ -188,7 +214,7 @@ def test_hallucination_risk_generates_source_grounding_patch() -> None:
 
 def test_safety_risk_requires_approval_and_never_auto_applies() -> None:
     root = _project("safety")
-    _write(root / "prompt.md", "Use tools.")
+    _write(root / "prompts" / "system.md", "Use tools.")
     run_path = _write_run(
         root,
         [{"id": "s1", "failure_type": "SAFETY_RISK", "description": "Unsafe external write without approval."}],
@@ -204,7 +230,7 @@ def test_safety_risk_requires_approval_and_never_auto_applies() -> None:
 
 def test_forbidden_tool_call_never_auto_applies() -> None:
     root = _project("forbidden")
-    _write(root / "prompt.md", "Do work.")
+    _write(root / "prompts" / "system.md", "Do work.")
     run_path = _write_run(
         root,
         [{"id": "f1", "failure_type": "FORBIDDEN_TOOL_CALL", "tool": "shell", "description": "Forbidden shell call."}],
@@ -221,7 +247,7 @@ def test_forbidden_tool_call_never_auto_applies() -> None:
 
 def test_scorer_uncertain_does_not_patch_agent() -> None:
     root = _project("scorer")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     run_path = _write_run(
         root,
         [{"id": "sc1", "failure_type": "SCORER_UNCERTAIN", "description": "Scorer could not decide."}],
@@ -236,7 +262,7 @@ def test_scorer_uncertain_does_not_patch_agent() -> None:
 
 def test_unknown_does_not_patch_agent() -> None:
     root = _project("unknown")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     run_path = _write_run(
         root,
         [{"id": "u1", "failure_type": "UNKNOWN", "description": "Insufficient evidence."}],
@@ -250,7 +276,7 @@ def test_unknown_does_not_patch_agent() -> None:
 
 def test_regression_prefers_rollback_when_previous_patch_metadata_exists() -> None:
     root = _project("regression_with_patch")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     run_path = _write_run(
         root,
         [{"id": "r1", "failure_type": "REGRESSION", "description": "New regression after patch."}],
@@ -265,7 +291,7 @@ def test_regression_prefers_rollback_when_previous_patch_metadata_exists() -> No
 
 def test_regression_without_metadata_is_review_only() -> None:
     root = _project("regression_no_patch")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     run_path = _write_run(
         root,
         [{"id": "r1", "failure_type": "REGRESSION", "description": "New regression after patch."}],
@@ -279,7 +305,7 @@ def test_regression_without_metadata_is_review_only() -> None:
 
 def test_denied_path_protection_never_leaks_secret_contents() -> None:
     root = _project("denied")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     _write(root / ".env", "SECRET_TOKEN=do-not-leak")
     run_path = _write_run(
         root,
@@ -304,7 +330,7 @@ def test_denied_path_protection_never_leaks_secret_contents() -> None:
 
 def test_allowlist_enforcement_creates_review_only_item() -> None:
     root = _project("allowlist")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     _write(root / "src" / "agent.py", "print('agent')\n")
     run_path = _write_run(
         root,
@@ -325,9 +351,119 @@ def test_allowlist_enforcement_creates_review_only_item() -> None:
     assert any("outside the patch allowlist" in note for note in proposal.reviewer_notes)
 
 
+def test_patch_preview_rejects_root_prompt_md_when_strict_allowlist_enabled() -> None:
+    root = _project("root_prompt_denied")
+    _write(root / "prompt.md", "Answer.")
+    run_path = _write_run(
+        root,
+        [
+            {
+                "id": "root_prompt",
+                "failure_type": "OUTPUT_SCHEMA_ERROR",
+                "target_file": "prompt.md",
+                "description": "Invalid JSON.",
+            }
+        ],
+    )
+
+    proposal = _preview(root, run_path).proposals[0]
+
+    assert proposal.target_files == ["prompt.md"]
+    assert proposal.files_changed == []
+    assert proposal.diff == ""
+    assert proposal.patch_type == "no_agent_patch_review_only"
+    assert not proposal.auto_apply_eligible
+    assert any("outside the patch allowlist" in note for note in proposal.reviewer_notes)
+
+
+def test_patch_preview_rejects_target_file_outside_project_root() -> None:
+    root = _project("outside_target")
+    outside = root.parent / f"outside_prompt_{uuid.uuid4().hex}.md"
+    _write(outside, "outside secret prompt")
+    run_path = _write_run(
+        root,
+        [
+            {
+                "id": "outside_target",
+                "failure_type": "OUTPUT_FORMAT_ERROR",
+                "description": "Output should be Markdown.",
+                "target_file": f"../{outside.name}",
+            }
+        ],
+    )
+
+    proposal = _preview(root, run_path).proposals[0]
+
+    assert proposal.files_changed == []
+    assert proposal.diff == ""
+    assert proposal.do_not_apply_automatically
+    assert any("escapes the project root" in note for note in proposal.reviewer_notes)
+
+
+def test_patch_preview_preview_only_reports_never_mark_direct_auto_apply() -> None:
+    root = _project("preview_only_auto_apply")
+    _write(root / "prompts" / "system.md", "Summarize documents.")
+    run_path = _write_run(
+        root,
+        [
+            {
+                "id": "auto_eligible_future_flow",
+                "failure_type": "TOOL_MISSING",
+                "tool": "document_reader",
+                "description": "document_reader was not called before answering.",
+            }
+        ],
+    )
+
+    report = _preview(root, run_path)
+    proposal = report.proposals[0]
+    latest = root / ".agentdoctor" / "patches" / "latest.json"
+    payload = json.loads(latest.read_text(encoding="utf-8"))
+
+    assert proposal.diff
+    assert not proposal.auto_apply_eligible
+    assert proposal.do_not_apply_automatically
+    assert report.auto_apply_eligible_count == 0
+    assert payload["proposals"][0]["auto_apply_eligible"] is False
+    assert payload["proposals"][0]["do_not_apply_automatically"] is True
+
+
+def test_argparse_patch_preview_accepts_no_dry_run_like_typer(
+    monkeypatch,
+) -> None:
+    root = _project("argparse_no_dry_run")
+    captured: dict[str, object] = {}
+
+    def fake_cmd_patch_preview(
+        from_run,
+        from_findings,
+        failure_type,
+        output,
+        output_format,
+        dry_run,
+        allow_apply,
+        apply_patch_id,
+        project_root,
+    ):
+        captured["dry_run"] = dry_run
+        captured["project_root"] = project_root
+        return 0
+
+    monkeypatch.setattr(cli_module, "_cmd_patch_preview", fake_cmd_patch_preview)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["c2a", "patch-preview", "--no-dry-run", "--project-root", str(root)],
+    )
+
+    assert cli_module._main_argparse() == 0
+    assert captured["dry_run"] is False
+    assert captured["project_root"] == root
+
+
 def test_baseline_impact_is_populated_when_baseline_exists() -> None:
     root = _project("baseline")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     _write(
         root / ".agentdoctor" / "baselines" / "latest.json",
         json.dumps(
@@ -353,7 +489,7 @@ def test_baseline_impact_is_populated_when_baseline_exists() -> None:
 
 def test_missing_baseline_does_not_crash() -> None:
     root = _project("no_baseline")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     run_path = _write_run(
         root,
         [{"id": "s1", "failure_type": "OUTPUT_SCHEMA_ERROR", "description": "Current schema fail."}],
@@ -367,7 +503,7 @@ def test_missing_baseline_does_not_crash() -> None:
 
 def test_finding_aggregation_groups_same_failure_type_and_cause() -> None:
     root = _project("aggregation")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     findings = [
         {"id": f"s{index}", "failure_type": "OUTPUT_SCHEMA_ERROR", "description": "Invalid JSON."}
         for index in range(5)
@@ -382,7 +518,7 @@ def test_finding_aggregation_groups_same_failure_type_and_cause() -> None:
 
 def test_compatible_merge_for_tool_missing_and_hallucination() -> None:
     root = _project("merge")
-    _write(root / "prompt.md", "Answer from documents.")
+    _write(root / "prompts" / "system.md", "Answer from documents.")
     run_path = _write_run(
         root,
         [
@@ -412,7 +548,7 @@ def test_compatible_merge_for_tool_missing_and_hallucination() -> None:
 
 def test_report_outputs_include_latest_json_markdown_and_diff() -> None:
     root = _project("report_outputs")
-    _write(root / "prompt.md", "Answer.")
+    _write(root / "prompts" / "system.md", "Answer.")
     run_path = _write_run(
         root,
         [{"id": "s1", "failure_type": "OUTPUT_SCHEMA_ERROR", "description": "Invalid JSON."}],
@@ -455,7 +591,13 @@ def _write_run(root: Path, findings: list[dict], extra: dict | None = None) -> P
 
 
 def _project(prefix: str) -> Path:
-    root = Path(__file__).resolve().parents[1] / ".test_runs" / "patch_preview"
+    base = Path(
+        os.environ.get(
+            "AGENTDOCTOR_TEST_ROOT",
+            str(Path(__file__).resolve().parents[1] / ".tmp_pytest_base" / "agentdoctor-test-runs"),
+        )
+    )
+    root = base / "patch_preview"
     path = root / f"{prefix}_{uuid.uuid4().hex}"
     path.mkdir(parents=True, exist_ok=True)
     return path

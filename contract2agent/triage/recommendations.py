@@ -197,7 +197,7 @@ def generate_recommendation(
     reasoning: list[str] = []
 
     if allow_auto and auto_readiness.eligible:
-        command = f"agentdoctor auto{agent_part}{goal_part} --target-confidence 0.85 --max-rounds 6 --preview-patches --review on-fail"
+        command = f"agentdoctor auto{agent_part}{goal_part} --target-confidence 0.85 --max-rounds 6 --review on-fail"
         alternatives.append(f"agentdoctor deep{agent_part}{goal_part} --rounds 3 --review on-fail")
         return (
             Recommendation(

@@ -7,8 +7,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from contract2agent.baseline import (
     build_rollback_recommendation,
+    build_time_cost_summary,
     compare_against_baseline,
     detect_overfitting_from_failure_type_changes,
     load_baseline,
@@ -25,6 +28,11 @@ from contract2agent.diagnostic_modes import (
 
 
 NOW = datetime(2026, 5, 3, 21, 30, 12, tzinfo=timezone.utc)
+
+
+@pytest.fixture
+def tmp_path() -> Path:
+    return _test_output_dir("baseline_tmp")
 
 
 def test_save_baseline_writes_baseline_snapshot_latest_hashes_and_copies() -> None:
@@ -197,6 +205,53 @@ def test_compare_latest_and_named_baseline_loading() -> None:
     assert named.baseline["baseline_name"] == "stable-v1"
 
 
+def test_load_baseline_latest_pointer_cannot_escape_project_root(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    latest = project / ".agentdoctor" / "baselines" / "latest.json"
+    latest.parent.mkdir(parents=True)
+    outside = tmp_path / "outside_baseline.json"
+    outside.write_text(json.dumps({"baseline_id": "outside_project_baseline"}), encoding="utf-8")
+    latest.write_text(
+        json.dumps(
+            {
+                "latest_baseline_id": "outside_project_baseline",
+                "path": "../outside_baseline.json",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_baseline(project, "latest")
+
+    assert loaded.baseline is None
+    assert any(".agentdoctor/baselines" in warning for warning in loaded.warnings)
+
+
+def test_save_baseline_outside_agent_path_warns_without_crashing(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    outside = tmp_path / "outside_agent.yaml"
+    outside.write_text("name: outside_secret_agent\n", encoding="utf-8")
+
+    result = save_baseline(
+        report=_report([_case("key_path", True)], confidence=0.9),
+        project_root=project,
+        agent_config_path="../outside_agent.yaml",
+        now=NOW,
+    )
+
+    snapshot = json.loads(result.snapshot_path.read_text(encoding="utf-8"))
+    artifact_text = _artifact_text(result.baseline_dir)
+
+    assert any("outside project root" in warning for warning in snapshot["warnings"])
+    assert all("outside_agent.yaml" not in path for path in snapshot["file_hashes"])
+    assert all(
+        "outside_agent.yaml" not in item["source"]
+        for item in snapshot["copied_config_files"]["copied_files"]
+    )
+    assert "outside_secret_agent" not in artifact_text
+
+
 def test_compare_handles_corrupt_baseline_without_stack_trace() -> None:
     tmp_path = _test_output_dir("corrupt")
     latest = tmp_path / ".agentdoctor" / "baselines" / "latest.json"
@@ -287,6 +342,23 @@ def test_overfitting_detection_from_failure_type_changes() -> None:
             _failure_change("HALLUCINATION_RISK", 0, 1, "new"),
         ]
     )
+
+
+def test_baseline_time_cost_uses_actual_test_durations() -> None:
+    report = _report(
+        [
+            _case("fast", False, score=0.0, duration_seconds=1.0),
+            _case("slow", False, score=0.0, duration_seconds=9.0),
+        ],
+        confidence=0.0,
+    )
+
+    summary = build_time_cost_summary(report)
+
+    assert summary["slowest_tests"][0]["test_id"] == "slow"
+    assert summary["slowest_tests"][0]["elapsed_seconds"] == 9.0
+    assert summary["slowest_tests"][1]["test_id"] == "fast"
+    assert summary["slowest_tests"][1]["elapsed_seconds"] == 1.0
 
 
 def test_cli_save_and_compare_baseline_parse() -> None:
@@ -390,6 +462,7 @@ def _report(
             check_rule=None,
             check_message=str(item.get("message") or ""),
             rule_scores=rule_scores,
+            duration_seconds=float(item.get("duration_seconds", 0.0)),
         )
         test_cases.append(test_case)
         test_results.append(result)
@@ -442,6 +515,7 @@ def _case(
     failed_rule: str | None = None,
     tags: list[str] | None = None,
     message: str | None = None,
+    duration_seconds: float = 0.0,
 ) -> dict[str, object]:
     return {
         "id": test_id,
@@ -450,6 +524,7 @@ def _case(
         "failed_rule": failed_rule,
         "tags": tags or ["task_completion"],
         "message": message or failed_rule or test_id,
+        "duration_seconds": duration_seconds,
     }
 
 
@@ -520,7 +595,13 @@ def _artifact_text(path: Path) -> str:
 def _test_output_dir(prefix: str) -> Path:
     import uuid
 
-    root = Path(__file__).resolve().parents[1] / ".test_runs" / "baseline"
+    base = Path(
+        os.environ.get(
+            "AGENTDOCTOR_TEST_ROOT",
+            str(Path(__file__).resolve().parents[1] / ".tmp_pytest_base" / "agentdoctor-test-runs"),
+        )
+    )
+    root = base / "baseline"
     path = root / f"{prefix}_{uuid.uuid4().hex}"
     path.mkdir(parents=True, exist_ok=True)
     return path

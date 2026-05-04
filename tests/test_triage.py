@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import uuid
@@ -18,7 +19,13 @@ NOW = datetime(2026, 5, 3, 21, 30, 12, tzinfo=timezone.utc)
 
 @pytest.fixture
 def tmp_path() -> Path:
-    root = Path(__file__).resolve().parents[1] / ".test_runs" / "triage"
+    base = Path(
+        os.environ.get(
+            "AGENTDOCTOR_TEST_ROOT",
+            str(Path(__file__).resolve().parents[1] / ".tmp_pytest_base" / "agentdoctor-test-runs"),
+        )
+    )
+    root = base / "triage"
     path = root / uuid.uuid4().hex
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -63,6 +70,21 @@ def test_agent_option_takes_priority(tmp_path: Path) -> None:
 
     assert plan.agent_summary.name == "coder_agent"
     assert plan.input_sources["agent_config"].path == "agents/coder.yaml"
+
+
+def test_triage_rejects_agent_path_outside_project_root(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    outside = tmp_path / "outside_agent.yaml"
+    _write_agent(project / "agent.yaml", name="inside_agent", tools=[])
+    _write_agent(outside, name="outside_secret_agent", tools=[])
+
+    plan = _triage(project, agent=Path("../outside_agent.yaml"))
+    report = (project / ".agentdoctor" / "triage" / "latest.json").read_text(encoding="utf-8")
+
+    assert plan.input_sources["agent_config"].status == "skipped"
+    assert plan.agent_summary.name != "outside_secret_agent"
+    assert "outside_secret_agent" not in report
+    assert any(warning.id == "agent_path_outside_project_root" for warning in plan.warnings)
 
 
 def test_multiple_agents_warning_uses_sorted_default(tmp_path: Path) -> None:
@@ -244,6 +266,20 @@ def test_auto_readiness_and_recommendation_rules(tmp_path: Path) -> None:
     unsafe = _triage(unsafe_root, agent=Path("agents/coder.yaml"), allow_auto=True)
     assert not unsafe.auto_readiness.eligible
     assert unsafe.recommendation.recommended_mode != "auto"
+
+
+def test_triage_auto_recommendation_uses_supported_auto_flags(tmp_path: Path) -> None:
+    _write_agent(tmp_path / "agent.yaml", tools=[])
+    _write(tmp_path / "prompts" / "system.md", "Return Markdown. If invalid, ask for clarification.")
+    _write(tmp_path / "evals" / "basic.yaml", "cases:\n  - name: key path\n    tags: [task_completion]\n")
+
+    plan = _triage(tmp_path, agent=Path("agent.yaml"), allow_auto=True)
+
+    assert plan.recommendation.recommended_mode == "auto"
+    assert "--preview-patches" not in plan.recommended_next_command
+    assert "--target-confidence" in plan.recommended_next_command
+    assert "--max-rounds" in plan.recommended_next_command
+    assert "--review" in plan.recommended_next_command
 
 
 def test_recommendation_rules_low_medium_high(tmp_path: Path) -> None:

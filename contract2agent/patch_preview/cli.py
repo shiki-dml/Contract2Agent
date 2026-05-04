@@ -134,7 +134,7 @@ def _proposal_for_group(
     reviewer_notes = list(strategy.reviewer_notes)
     reviewer_notes.extend(target.warnings)
     reviewer_notes.append(
-        "Current CLI validation does not yet support --focus or --compare-baseline; use validation_tags to choose focused cases."
+        "Use validation_tags with `agentdoctor deep --focus ...`; add `--compare-baseline latest` when a saved baseline should be checked."
     )
 
     if _can_generate_diff(strategy, target):
@@ -155,8 +155,8 @@ def _proposal_for_group(
     if not diff and patch_type != "rollback_patch":
         patch_type = "no_agent_patch_review_only"
 
-    # Recompute risk flags after review-only downgrade so auto_apply_eligible is
-    # false when no diff exists.
+    # Recompute risk flags after review-only downgrade so preview-only flags
+    # reflect the final proposal shape.
     risk_level, requires_approval, auto_apply_eligible, do_not_apply = compute_risk_and_approval(
         group,
         patch_type=patch_type,

@@ -21,6 +21,7 @@ from contract2agent.diagnostic_modes import (
     TestCase,
     TestResult,
 )
+from contract2agent.path_safety import PathContainmentError, is_within, resolve_within
 
 try:
     import yaml
@@ -768,9 +769,13 @@ def build_time_cost_summary(report: DiagnosticReport) -> dict[str, Any]:
         average = None
     for test_id, (round_report, test_case, result) in latest.items():
         elapsed = _elapsed_seconds(round_report.started_at, round_report.finished_at)
-        if elapsed is None:
+        result_duration = _to_float(getattr(result, "duration_seconds", None))
+        if result_duration is not None and result_duration > 0:
+            per_test = round(result_duration, 3)
+        elif elapsed is not None:
+            per_test = round(elapsed / max(1, len(round_report.test_results)), 3)
+        else:
             continue
-        per_test = round(elapsed / max(1, len(round_report.test_results)), 3)
         slowest.append(
             {
                 "test_id": test_id,
@@ -1410,7 +1415,10 @@ def load_baseline(project_root: str | Path, baseline_ref: str | None = "latest")
         if payload is None:
             return BaselineLoadResult(None, latest_path, [warning or "Latest baseline JSON is unreadable."])
         if "path" in payload and "latest_baseline_id" in payload:
-            target = _resolve_under_root(root, str(payload["path"]))
+            try:
+                target = _resolve_baseline_pointer(root, baselines_dir, str(payload["path"]))
+            except PathContainmentError as exc:
+                return BaselineLoadResult(None, latest_path, [str(exc)])
             record, record_warning = _read_json_file(target)
             if record is None:
                 return BaselineLoadResult(
@@ -1421,11 +1429,15 @@ def load_baseline(project_root: str | Path, baseline_ref: str | None = "latest")
             return BaselineLoadResult(record, target)
         return BaselineLoadResult(payload, latest_path)
 
-    direct_dir = baselines_dir / ref / "baseline.json"
+    direct_dir = (baselines_dir / ref / "baseline.json").resolve()
+    if not is_within(direct_dir, baselines_dir):
+        return BaselineLoadResult(None, None, [f"Baseline {ref!r} is outside .agentdoctor/baselines."])
     if direct_dir.exists():
         payload, warning = _read_json_file(direct_dir)
         return BaselineLoadResult(payload, direct_dir, [warning] if warning else [])
-    direct_file = baselines_dir / f"{ref}.json"
+    direct_file = (baselines_dir / f"{ref}.json").resolve()
+    if not is_within(direct_file, baselines_dir):
+        return BaselineLoadResult(None, None, [f"Baseline {ref!r} is outside .agentdoctor/baselines."])
     if direct_file.exists():
         payload, warning = _read_json_file(direct_file)
         return BaselineLoadResult(payload, direct_file, [warning] if warning else [])
@@ -1455,7 +1467,11 @@ def discover_snapshot_files(
                 continue
             safe.add(rel)
     if agent_config_path is not None:
-        path = _resolve_under_root(project_root, agent_config_path)
+        try:
+            path = resolve_within(project_root, agent_config_path)
+        except PathContainmentError:
+            warnings.append(f"Agent config path is outside project root and was skipped: {agent_config_path}")
+            return {"safe": sorted(safe, key=str.casefold), "warnings": warnings}
         if path.exists() and path.is_file() and not is_excluded_path(path, project_root):
             safe.add(_relative(project_root, path))
         else:
@@ -1515,6 +1531,10 @@ def sha256_file(path: str | Path) -> str | None:
 
 
 def copy_snapshot_file(root: Path, source: Path, copied_root: Path) -> tuple[Path | None, str | None]:
+    try:
+        source = resolve_within(root, source)
+    except PathContainmentError:
+        return None, f"Skipped snapshot file outside project root: {source}"
     rel = _relative(root, source)
     if is_excluded_path(source, root):
         return None, f"Excluded unsafe file from snapshot: {rel}"
@@ -2058,7 +2078,10 @@ def _load_baseline_snapshot(
     ref = _mapping(baseline.get("agent_state_snapshot_ref"))
     snapshot_path = ref.get("snapshot_path")
     if snapshot_path:
-        target = _resolve_under_root(project_root, str(snapshot_path))
+        try:
+            target = resolve_within(project_root, str(snapshot_path))
+        except PathContainmentError:
+            return None, ["Baseline snapshot path is outside project root."]
     elif baseline_path is not None:
         target = baseline_path.parent / "snapshot.json"
     else:
@@ -2340,10 +2363,10 @@ def _find_agent_config(
     files = _mapping(parsed.get("files"))
     if agent_config_path is not None:
         try:
-            rel = _relative(root, _resolve_under_root(root, agent_config_path))
+            rel = _relative(root, resolve_within(root, agent_config_path))
             if rel in files:
                 return rel
-        except OSError:
+        except (OSError, PathContainmentError):
             pass
     for rel in sorted(files, key=str.casefold):
         if _path_category(rel) == "agent_config":
@@ -2407,11 +2430,19 @@ def _elapsed_seconds(started_at: str | None, finished_at: str | None) -> float |
     return round(max(0.0, (finished - started).total_seconds()), 3)
 
 
+def _resolve_baseline_pointer(root: Path, baselines_dir: Path, path: str | Path) -> Path:
+    for base in (root, baselines_dir):
+        try:
+            candidate = resolve_within(base, path)
+        except PathContainmentError:
+            continue
+        if is_within(candidate, baselines_dir):
+            return candidate
+    raise PathContainmentError("Latest baseline pointer target is outside .agentdoctor/baselines.")
+
+
 def _resolve_under_root(root: Path, path: str | Path) -> Path:
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = root / candidate
-    return candidate.resolve()
+    return resolve_within(root, path)
 
 
 def _relative(root: Path, path: str | Path | None) -> str:

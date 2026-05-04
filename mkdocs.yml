@@ -1,0 +1,46 @@
+site_name: AgentDoctor
+site_description: A lightweight diagnostic toolkit for LLM agents.
+repo_name: shiki-dml/AgentDoctor
+repo_url: https://github.com/shiki-dml/AgentDoctor
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Overview: getting-started.md
+      - CLI Reference: cli.md
+      - Configuration: configuration.md
+      - Reports: reports.md
+  - Diagnostic Modes:
+      - Triage: triage.md
+      - Quick Check: quick.md
+      - Deep Diagnosis: deep.md
+      - Auto Mode: auto.md
+  - Core Features:
+      - Failure Taxonomy: failure-taxonomy.md
+      - Baselines: baselines.md
+      - Patch Preview: patch-preview.md
+      - Time Cost: time-cost.md
+  - Examples:
+      - Examples: examples.md
+  - Development:
+      - Development Guide: development.md
+      - Audits:
+          - 2026-05-04 Bug Audit: audits/2026-05-04-bug-audit.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences

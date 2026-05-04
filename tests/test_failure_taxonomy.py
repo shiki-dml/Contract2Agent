@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -506,7 +507,12 @@ def _finding(failure_type: FailureType, test_id: str) -> Finding:
 
 
 def _test_output_dir(prefix: str) -> Path:
-    root = Path(__file__).resolve().parents[1] / ".test_runs"
+    root = Path(
+        os.environ.get(
+            "AGENTDOCTOR_TEST_ROOT",
+            str(Path(__file__).resolve().parents[1] / ".tmp_pytest_base" / "agentdoctor-test-runs"),
+        )
+    )
     path = root / f"{prefix}_{uuid.uuid4().hex}"
     path.mkdir(parents=True, exist_ok=True)
     return path

@@ -22,8 +22,9 @@ def compute_risk_and_approval(
     )
     requires_approval = _requires_approval(risk, failure_types, auto_apply_eligible)
 
-    # Patch Preview v0.1 is a review gate. It computes eligibility for future
-    # flows but never marks a generated proposal as directly auto-applicable.
+    # Patch Preview v0.1 is a review gate and must not mark proposals as
+    # directly auto-applicable.
+    auto_apply_eligible = False
     do_not_apply_automatically = True
     if risk in {"high", "critical", "unknown"}:
         do_not_apply_automatically = True

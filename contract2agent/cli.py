@@ -27,6 +27,7 @@ from contract2agent.diagnosis import (
     write_diagnosis_report_yaml,
 )
 from contract2agent.diagnostic_modes import (
+    MAX_DEEP_ROUNDS,
     ReviewPolicy,
     auto_mode_warnings,
     default_contract,
@@ -192,6 +193,8 @@ def _cmd_triage(
     allow_auto: bool = False,
     include_cost: bool = False,
 ) -> int:
+    if (error := _validate_choice(output_format, "--format", ("markdown", "json"))) is not None:
+        return error
     plan = run_triage(
         TriageOptions(
             project_root=project_root,
@@ -206,8 +209,6 @@ def _cmd_triage(
         console.print(format_triage_json_report(plan).rstrip())
     elif normalized == "markdown":
         console.print(format_triage_terminal_summary(plan))
-    else:
-        raise ValueError("--format must be markdown or json")
     if include_cost:
         latest_triage_json = Path(
             plan.report_paths.get("latest_json", ".agentdoctor/triage/latest.json")
@@ -238,6 +239,8 @@ def _cmd_patch_preview(
     apply_patch_id: str | None = None,
     project_root: Path = Path("."),
 ) -> int:
+    if (error := _validate_choice(output_format, "--format", ("markdown", "json"))) is not None:
+        return error
     report = run_patch_preview(
         PatchPreviewOptions(
             project_root=project_root,
@@ -256,8 +259,6 @@ def _cmd_patch_preview(
         console.print(format_patch_preview_json_report(report).rstrip())
     elif normalized == "markdown":
         console.print(format_patch_preview_terminal_summary(report))
-    else:
-        raise ValueError("--format must be markdown or json")
     return 0
 
 
@@ -277,6 +278,12 @@ def _cmd_cost_estimate(
     output: Path | None = None,
     output_format: str = "markdown",
 ) -> int:
+    if (error := _validate_choice(mode, "--mode", ("quick", "deep", "auto"))) is not None:
+        return error
+    if (error := _validate_choice(budget, "--budget", ("conservative", "balanced", "thorough"))) is not None:
+        return error
+    if (error := _validate_choice(output_format, "--format", ("markdown", "json"))) is not None:
+        return error
     _, rendered = run_cost_estimate(
         CostEstimateOptions(
             from_triage=from_triage,
@@ -336,6 +343,22 @@ def _parse_focus_tags(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _validate_choice(value: str | None, flag: str, choices: tuple[str, ...]) -> int | None:
+    if value is None:
+        return None
+    if value.casefold() in choices:
+        return None
+    return _cli_error(f"{flag} must be {_choice_list(choices)}")
+
+
+def _choice_list(choices: tuple[str, ...]) -> str:
+    if len(choices) == 1:
+        return choices[0]
+    if len(choices) == 2:
+        return f"{choices[0]} or {choices[1]}"
+    return f"{', '.join(choices[:-1])}, or {choices[-1]}"
 
 
 def _handle_baseline_actions(
@@ -412,6 +435,12 @@ def _cmd_deep(
     compare_baseline_ref: str | None = None,
     focus: str | None = None,
 ) -> int:
+    if rounds < 1:
+        return _cli_error("--rounds must be at least 1")
+    if rounds > MAX_DEEP_ROUNDS:
+        return _cli_error(f"--rounds must be no more than {MAX_DEEP_ROUNDS}")
+    if (error := _validate_choice(review, "--review", ("never", "on-fail", "each-round"))) is not None:
+        return error
     report = run_deep_diagnosis(
         rounds=rounds,
         review_policy=review,
@@ -446,6 +475,14 @@ def _cmd_auto(
     baseline_name: str | None = None,
     compare_baseline_ref: str | None = None,
 ) -> int:
+    if not 0 <= target_confidence <= 1:
+        return _cli_error("--target-confidence must be between 0 and 1")
+    if max_rounds < 1:
+        return _cli_error("--max-rounds must be at least 1")
+    if max_time_minutes < 1:
+        return _cli_error("--max-time-minutes must be at least 1")
+    if (error := _validate_choice(review, "--review", ("never", "on-fail", "each-round"))) is not None:
+        return error
     for warning in auto_mode_warnings(target_confidence):
         console.print(warning)
     report = run_auto_diagnosis(
@@ -472,6 +509,11 @@ def _cmd_auto(
     )
 
 
+def _cli_error(message: str) -> int:
+    print(f"Error: {message}", file=sys.stderr)
+    return 2
+
+
 def _cmd_check_all(
     contract: Path,
     traces: Path,
@@ -479,6 +521,8 @@ def _cmd_check_all(
     profile: str = "balanced",
     write_regression_traces_dir: Path | None = None,
 ) -> int:
+    if (error := _validate_choice(profile, "--profile", ("permissive", "balanced", "strict"))) is not None:
+        return error
     loaded_contract = load_contract(contract)
     manifest = _load_manifest(traces / "manifest.yaml")
     report_rows: list[dict[str, Any]] = []
@@ -544,6 +588,10 @@ def _cmd_diagnose(
     profile: str = "balanced",
     write_regression_traces_dir: Path | None = None,
 ) -> int:
+    if (error := _validate_choice(output_format, "--format", ("markdown", "yaml"))) is not None:
+        return error
+    if (error := _validate_choice(profile, "--profile", ("permissive", "balanced", "strict"))) is not None:
+        return error
     loaded_contract = load_contract(contract)
     manifest = _load_manifest(manifest_path or traces / "manifest.yaml")
     requirement_text = (
@@ -573,6 +621,8 @@ def _cmd_why(
     out: Path | None = None,
     profile: str = "balanced",
 ) -> int:
+    if (error := _validate_choice(profile, "--profile", ("permissive", "balanced", "strict"))) is not None:
+        return error
     loaded_contract = load_contract(contract)
     loaded_trace = load_trace_file_or_empty(trace)
     manifest = _load_manifest(manifest_path) if manifest_path is not None else {}
@@ -1481,7 +1531,8 @@ def _main_argparse() -> int:
         choices=("markdown", "json"),
         default="markdown",
     )
-    patch_preview_parser.add_argument("--dry-run", action="store_true", default=True)
+    patch_preview_parser.add_argument("--dry-run", dest="dry_run", action="store_true", default=True)
+    patch_preview_parser.add_argument("--no-dry-run", dest="dry_run", action="store_false")
     patch_preview_parser.add_argument("--allow-apply", action="store_true")
     patch_preview_parser.add_argument("--apply", dest="apply_patch_id")
     patch_preview_parser.add_argument("--project-root", default=Path("."), type=Path)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import uuid
@@ -14,7 +15,13 @@ from contract2agent.cost_estimate.models import STATIC_ESTIMATE_NOTE, to_plain_d
 
 @pytest.fixture
 def tmp_path() -> Path:
-    root = Path(__file__).resolve().parents[1] / ".test_runs" / "cost_estimate"
+    base = Path(
+        os.environ.get(
+            "AGENTDOCTOR_TEST_ROOT",
+            str(Path(__file__).resolve().parents[1] / ".tmp_pytest_base" / "agentdoctor-test-runs"),
+        )
+    )
+    root = base / "cost_estimate"
     path = root / uuid.uuid4().hex
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -90,6 +97,50 @@ def test_missing_triage_does_not_crash(tmp_path: Path) -> None:
     assert estimate.complexity_level == "unknown"
     assert estimate.recommended_command == "agentdoctor triage --include-cost"
     assert any("Run agentdoctor triage first" in warning for warning in estimate.warnings)
+
+
+def test_cost_estimate_skips_triage_paths_outside_project_root(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    outside_eval = tmp_path / "outside_eval.yaml"
+    outside_baseline = tmp_path / "outside_baseline.json"
+    _write(
+        outside_eval,
+        """
+        cases:
+          - name: outside_secret_case
+            tags: [outside_secret_tag]
+        """,
+    )
+    _write(
+        outside_baseline,
+        json.dumps(
+            {
+                "average_runtime_seconds": 999,
+                "slowest_tests": ["outside_secret_test"],
+            }
+        ),
+    )
+    triage = _write_triage(
+        project,
+        risk_level="medium",
+        tools=[],
+        eval_sources=[{"path": "../outside_eval.yaml", "status": "found"}],
+        baseline_exists=True,
+    )
+    data = json.loads(triage.read_text(encoding="utf-8"))
+    data["baseline_status"]["path"] = "../outside_baseline.json"
+    data["input_sources"]["baseline"]["path"] = "../outside_baseline.json"
+    triage.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    estimate = build_cost_estimate(CostEstimateOptions(from_triage=triage), cwd=project)
+    serialized = json.dumps(to_plain_data(estimate))
+
+    assert "outside_secret_case" not in serialized
+    assert "outside_secret_tag" not in serialized
+    assert "outside_secret_test" not in serialized
+    assert any("outside project root" in warning for warning in estimate.warnings)
+    assert estimate.baseline_cost_context is not None
+    assert estimate.baseline_cost_context.historical_cost_used is False
 
 
 def test_low_risk_quick_estimate(tmp_path: Path) -> None:

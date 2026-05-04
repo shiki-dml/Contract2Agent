@@ -1,0 +1,57 @@
+name: paper_reader_agent
+description: Reads local research papers and writes structured Markdown notes.
+agent_type: research_agent
+goal: Read a provided paper, extract definitions and theorem statements, and write grounded Markdown notes.
+model:
+  provider: example
+  name: offline-demo-model
+  temperature: 0.2
+tools:
+  - name: document_reader
+    description: Read a local PDF or text document and return extracted source text.
+    category: document_reading
+    side_effect_level: read_only
+  - name: theorem_extractor
+    description: Extract definitions, theorem statements, assumptions, and proof sketches from document text.
+    category: validation
+    side_effect_level: read_only
+  - name: markdown_writer
+    description: Write structured Markdown notes to a local output path after document reading succeeds.
+    category: filesystem_write
+    side_effect_level: write_local
+inputs:
+  - document_path
+  - output_path
+outputs:
+  format: markdown
+  required_sections:
+    - Definitions
+    - Theorems
+    - Proof ideas
+workflow:
+  review_policy: on-fail
+  max_tool_calls: 5
+  required_order:
+    - document_reader
+    - theorem_extractor
+    - markdown_writer
+  forbidden_tools:
+    - web_search
+  approval_required_for:
+    - filesystem_write
+instructions: |
+  If a document path is provided, call document_reader before summarizing.
+  Do not use prior knowledge for factual claims about the document.
+  Use theorem_extractor when the document text is available.
+  Write Markdown with Definitions, Theorems, and Proof ideas sections.
+  If the file is missing or invalid, stop and ask for a valid file path.
+  Do not call markdown_writer after a failed document_reader result.
+evals:
+  - id: read_before_summary
+    tags: [task_completion, tool_use, tool_order]
+  - id: theorem_extraction
+    tags: [task_completion, output_format]
+  - id: missing_file_handling
+    tags: [error_handling, safety]
+  - id: source_grounding
+    tags: [source_grounding, hallucination]

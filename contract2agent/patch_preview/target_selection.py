@@ -4,52 +4,31 @@ import fnmatch
 from dataclasses import dataclass
 from pathlib import Path
 
+from contract2agent.path_safety import PathContainmentError, resolve_within
 from contract2agent.patch_preview.models import FindingGroup
 from contract2agent.patch_preview.security import is_denied_path
 
 
 ALLOWED_TARGET_PATTERNS = [
     "prompts/*.md",
-    "prompts/*.txt",
-    "prompt.md",
-    "system_prompt.md",
-    "instructions.md",
     "agent.yaml",
     "agent.yml",
-    "agent.json",
-    ".agentdoctor/agent.yaml",
     "tool_descriptions.yaml",
     "tool_descriptions.yml",
-    "tools.yaml",
-    "tools.yml",
-    "agent_tools.yaml",
     "workflow_config.yaml",
     "workflow_config.yml",
     "eval_config.yaml",
     "eval_config.yml",
-    "evals/*.yaml",
-    "evals/*.yml",
-    "evals/*.json",
-    ".agentdoctor/evals/*.yaml",
-    ".agentdoctor/evals/*.yml",
-    ".agentdoctor/evals/*.json",
 ]
 
 PROMPT_PATTERNS = [
     "prompts/system.md",
-    "prompt.md",
-    "system_prompt.md",
-    "instructions.md",
     "prompts/*.md",
-    "prompts/*.txt",
 ]
 
 TOOL_PATTERNS = [
     "tool_descriptions.yaml",
     "tool_descriptions.yml",
-    "tools.yaml",
-    "tools.yml",
-    "agent_tools.yaml",
 ]
 
 WORKFLOW_PATTERNS = [
@@ -57,25 +36,16 @@ WORKFLOW_PATTERNS = [
     "workflow_config.yml",
     "agent.yaml",
     "agent.yml",
-    ".agentdoctor/agent.yaml",
 ]
 
 AGENT_CONFIG_PATTERNS = [
     "agent.yaml",
     "agent.yml",
-    "agent.json",
-    ".agentdoctor/agent.yaml",
 ]
 
 EVAL_PATTERNS = [
     "eval_config.yaml",
     "eval_config.yml",
-    "evals/*.yaml",
-    "evals/*.yml",
-    "evals/*.json",
-    ".agentdoctor/evals/*.yaml",
-    ".agentdoctor/evals/*.yml",
-    ".agentdoctor/evals/*.json",
 ]
 
 
@@ -94,7 +64,16 @@ def select_target_file(
 ) -> TargetSelection:
     root = project_root.resolve()
     if group.target_file:
-        candidate = _resolve_under_root(root, group.target_file)
+        try:
+            candidate = _resolve_under_root(root, group.target_file)
+        except PathContainmentError:
+            relative = Path(group.target_file).as_posix()
+            return TargetSelection(
+                target=None,
+                target_files=[relative],
+                warnings=[f"Denied patch target was skipped: {relative}"],
+                review_only_reason="The suggested target escapes the project root.",
+            )
         relative = _relative(root, candidate)
         if is_denied_path(candidate, root):
             return TargetSelection(
@@ -134,13 +113,11 @@ def select_target_file(
 
 
 def is_allowed_target(path: str | Path, project_root: str | Path) -> bool:
-    root = Path(project_root).resolve()
-    target = Path(path)
-    if not target.is_absolute():
-        target = root / target
+    root = Path(project_root).expanduser().resolve()
     try:
-        relative = target.resolve().relative_to(root)
-    except ValueError:
+        target = resolve_within(root, path)
+        relative = target.relative_to(root)
+    except (OSError, PathContainmentError, ValueError):
         return False
     rel = relative.as_posix()
     if is_denied_path(target, root):
@@ -172,10 +149,7 @@ def _existing_allowed_targets(root: Path, patterns: list[str]) -> list[Path]:
 
 
 def _resolve_under_root(root: Path, path: str | Path) -> Path:
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = root / candidate
-    return candidate.resolve()
+    return resolve_within(root, path)
 
 
 def _relative(root: Path, path: Path | str) -> str:

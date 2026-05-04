@@ -4,6 +4,7 @@ import fnmatch
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from contract2agent.path_safety import PathContainmentError, is_within, resolve_within
 from contract2agent.triage.models import InputSource, TriageWarning
 
 
@@ -129,16 +130,34 @@ def discover_project(project_root: str | Path, agent_path: str | Path | None = N
     result.all_agent_configs = discovered_agents
 
     if agent_path is not None:
-        selected = _resolve_under_root(root, agent_path)
-        if selected.exists() and selected.is_file() and not is_excluded_path(selected, root):
-            result.agent_config_path = selected
-            result.agent_config = InputSource(_relative(root, selected), "found")
-        else:
+        try:
+            selected = _resolve_under_root(root, agent_path)
+        except PathContainmentError:
             result.agent_config = InputSource(
-                _relative(root, selected),
-                "missing",
-                "Specified --agent path was not found or is excluded.",
+                Path(agent_path).as_posix(),
+                "skipped",
+                "Specified --agent path is outside --project-root.",
             )
+            result.warnings.append(
+                TriageWarning(
+                    id="agent_path_outside_project_root",
+                    severity="warning",
+                    title="Skipped outside agent config",
+                    description="The specified --agent path resolves outside --project-root and was not read.",
+                    evidence=[Path(agent_path).as_posix()],
+                    recommended_action="Pass an agent config path inside --project-root.",
+                )
+            )
+        else:
+            if selected.exists() and selected.is_file() and not is_excluded_path(selected, root):
+                result.agent_config_path = selected
+                result.agent_config = InputSource(_relative(root, selected), "found")
+            else:
+                result.agent_config = InputSource(
+                    _relative(root, selected),
+                    "missing",
+                    "Specified --agent path was not found or is excluded.",
+                )
         result.prompt_paths = _dedupe_paths(_glob_patterns(root, PROMPT_PATTERNS))
     else:
         if discovered_agents:
@@ -189,6 +208,8 @@ def discover_project(project_root: str | Path, agent_path: str | Path | None = N
 
 
 def safe_read_text(path: Path, project_root: Path) -> FileRead:
+    if not is_within(path, project_root):
+        return FileRead(path=path, text=None, status="skipped", reason="Path is outside project root.")
     if is_excluded_path(path, project_root):
         return FileRead(path=path, text=None, status="skipped", reason="Excluded secret or unsafe path.")
     try:
@@ -227,7 +248,7 @@ def is_excluded_path(path: Path, project_root: Path) -> bool:
     try:
         relative = path.resolve().relative_to(project_root.resolve())
     except ValueError:
-        relative = path
+        return True
     parts = {part.casefold() for part in relative.parts[:-1]}
     if parts & EXCLUDED_DIRS:
         return True
@@ -253,10 +274,7 @@ def _dedupe_paths(paths: list[Path]) -> list[Path]:
 
 
 def _resolve_under_root(root: Path, path: str | Path) -> Path:
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = root / candidate
-    return candidate.resolve()
+    return resolve_within(root, path)
 
 
 def _relative(root: Path, path: Path | str) -> str:

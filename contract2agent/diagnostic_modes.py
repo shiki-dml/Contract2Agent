@@ -33,6 +33,7 @@ from contract2agent.failure_taxonomy import (
     summarize_time_cost_by_failure_type,
 )
 from contract2agent.parser import parse_requirement
+from contract2agent.path_safety import PathContainmentError, resolve_within
 from contract2agent.schema import AgentContract
 
 try:
@@ -51,6 +52,8 @@ DIAGNOSTIC_COMPONENT_WEIGHTS = {
     "stability_score": 0.10,
     "safety_score": 0.10,
 }
+
+MAX_DEEP_ROUNDS = 20
 
 SAFE_PATCH_EXACT_NAMES = {
     "agent.yaml",
@@ -81,12 +84,19 @@ UNSAFE_SOURCE_SUFFIXES = {
 UNSAFE_EXACT_NAMES = {
     ".env",
     ".env.local",
+    ".env.production",
+    ".env.development",
+    ".env.test",
     "package-lock.json",
     "pnpm-lock.yaml",
     "yarn.lock",
     "uv.lock",
     "poetry.lock",
     "pdm.lock",
+    "bun.lock",
+    "bun.lockb",
+    "cargo.lock",
+    "gemfile.lock",
 }
 
 UNSAFE_NAME_PARTS = ("auth", "secret", "token", "credential", "permission", "api")
@@ -854,6 +864,8 @@ def run_deep_diagnosis(
 ) -> DiagnosticReport:
     if rounds < 1:
         raise ValueError("--rounds must be at least 1")
+    if rounds > MAX_DEEP_ROUNDS:
+        raise ValueError(f"--rounds must be no more than {MAX_DEEP_ROUNDS}")
     contract = contract or default_contract()
     agent = agent or SyntheticDiagnosticAgent()
     policy = parse_review_policy(review_policy)
@@ -887,6 +899,17 @@ def run_deep_diagnosis(
                 break
 
     status = _status_for_rounds(round_reports, review_required)
+    has_failed_or_warning_cases = any(
+        not result.passed or result.warning_count
+        for round_report in round_reports
+        for result in round_report.test_results
+    )
+    recommendations = [
+        "Review failed or warning cases before deploying this agent."
+        if has_failed_or_warning_cases
+        else "No deep-run failures or warnings were detected.",
+        "Deep mode does not modify the agent; use auto mode only for allowlisted prompt/config repair.",
+    ]
     report = _build_report(
         mode=DiagnosticMode.DEEP,
         status=status,
@@ -895,10 +918,7 @@ def run_deep_diagnosis(
         target_confidence=None,
         review_required=review_required,
         review_items=review_items,
-        recommendations=[
-            "Review failed or warning cases before deploying this agent.",
-            "Deep mode does not modify the agent; use auto mode only for allowlisted prompt/config repair.",
-        ],
+        recommendations=recommendations,
     )
     write_diagnostic_report(report, out_dir)
     return report
@@ -941,6 +961,7 @@ def run_auto_diagnosis(
     review_required = False
     low_improvement_count = 0
     previous_confidence: float | None = None
+    post_patch_validation_confidence: float | None = None
     status = "failed"
 
     for index in range(1, max_rounds + 1):
@@ -1075,6 +1096,13 @@ def run_auto_diagnosis(
                     requires_user_decision=True,
                 )
             )
+        else:
+            post_patch_validation_confidence = validation_round.confidence
+            if validation_round.confidence >= target_confidence:
+                status = "passed_with_review_recommended" if review_required else "passed"
+                patch_history.append(patch)
+                previous_confidence = round_report.confidence
+                break
         patch_history.append(patch)
         previous_confidence = round_report.confidence
     else:
@@ -1085,7 +1113,11 @@ def run_auto_diagnosis(
         agent=agent,
         holdout_cases=split["holdout"],
     )
-    final_confidence = rounds_run[-1].confidence if rounds_run else 0.0
+    final_confidence = (
+        post_patch_validation_confidence
+        if post_patch_validation_confidence is not None
+        else rounds_run[-1].confidence if rounds_run else 0.0
+    )
     overfitting_warning = _overfitting_warning(
         rounds_run,
         holdout_confidence,
@@ -1110,6 +1142,7 @@ def run_auto_diagnosis(
         "patches_attempted": len(patch_history),
         "elapsed_seconds": round(time.monotonic() - started, 3),
         "holdout_confidence": holdout_confidence,
+        "post_patch_validation_confidence": post_patch_validation_confidence,
         "diagnostic_tests": [case.id for case in split["diagnostic"]],
         "validation_tests": [case.id for case in split["validation"]],
         "holdout_tests": [case.id for case in split["holdout"]],
@@ -1136,6 +1169,7 @@ def run_auto_diagnosis(
         efficiency_warning=efficiency_warning,
         budget_summary=budget_summary,
         recommendations=recommendations,
+        overall_confidence_override=final_confidence,
     )
     report.overall_confidence = final_confidence
     write_diagnostic_report(report, out_dir)
@@ -1416,29 +1450,31 @@ def _recommended_deep_command(focus_tags: list[str]) -> str:
 
 
 def is_safe_patch_target(path: str | Path, repo_root: str | Path) -> bool:
-    root = Path(repo_root).resolve()
-    target = Path(path).resolve()
+    root = Path(repo_root).expanduser().resolve()
     try:
+        target = resolve_within(root, path)
         relative = target.relative_to(root)
-    except ValueError:
+    except (OSError, PathContainmentError, ValueError):
         return False
 
     parts = [part.casefold() for part in relative.parts]
     name = target.name.casefold()
     suffix = target.suffix.casefold()
+    if not parts:
+        return False
     if name in UNSAFE_EXACT_NAMES:
+        return False
+    if name == ".env" or name.startswith(".env."):
         return False
     if suffix in UNSAFE_SOURCE_SUFFIXES:
         return False
-    if any(part in {"reports", "traces", ".git", "__pycache__"} for part in parts):
+    if any(part in {".agentdoctor", ".git", "reports", "traces", "__pycache__"} for part in parts):
         return False
     if any(unsafe in name for unsafe in UNSAFE_NAME_PARTS):
         return False
-    if name in SAFE_PATCH_EXACT_NAMES:
+    if len(parts) == 1 and name in SAFE_PATCH_EXACT_NAMES:
         return True
-    if parts and parts[0] == "prompts" and suffix == ".md":
-        return True
-    if "prompt" in name and suffix in {".md", ".txt", ".yaml", ".yml"}:
+    if len(parts) == 2 and parts[0] == "prompts" and suffix == ".md":
         return True
     return False
 
@@ -1544,6 +1580,9 @@ def format_markdown_report(report: DiagnosticReport) -> str:
     else:
         lines.append("No findings were generated.")
 
+    if report.time_cost_summary is not None:
+        lines.extend(["", *_time_cost_markdown(report), ""])
+
     lines.extend(["", render_failure_taxonomy_markdown(report.taxonomy_summary), ""])
 
     lines.extend(["## Failure Type Changes", ""])
@@ -1620,6 +1659,133 @@ def format_markdown_report(report: DiagnosticReport) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _time_cost_markdown(report: DiagnosticReport) -> list[str]:
+    lines = ["## Time Cost", ""]
+    total_elapsed = _report_total_elapsed_seconds(report)
+    average_test = _average_test_seconds(report, total_elapsed)
+    lines.extend(
+        [
+            f"Total elapsed seconds: {_format_seconds(total_elapsed)}",
+            f"Rounds executed: {report.total_rounds_executed}",
+            f"Tests executed: {report.pass_count + report.fail_count}",
+        ]
+    )
+    if average_test is not None:
+        lines.append(f"Average test time: {_format_seconds(average_test)}")
+
+    slowest = _slowest_test_items(report)
+    if slowest:
+        lines.extend(["", "Slowest tests:"])
+        for item in slowest[:5]:
+            failure_type = item.get("failure_type")
+            suffix = f" ({failure_type})" if failure_type else ""
+            lines.append(
+                f"- {item['test_id']}: {_format_seconds(item['duration_seconds'])}{suffix}"
+            )
+
+    warning = (
+        report.efficiency_warning
+        or getattr(report.time_cost_summary, "efficiency_warning", None)
+        or report.budget_summary.get("warning")
+        or report.budget_summary.get("efficiency_warning")
+    )
+    if warning:
+        lines.extend(["", f"Warning: {warning}"])
+    return lines
+
+
+def _report_total_elapsed_seconds(report: DiagnosticReport) -> float | None:
+    value = _to_optional_float(report.budget_summary.get("elapsed_seconds"))
+    if value is not None:
+        return round(value, 3)
+    elapsed = [
+        seconds
+        for seconds in (_round_elapsed_seconds(round_report) for round_report in report.rounds)
+        if seconds is not None
+    ]
+    if elapsed:
+        return round(sum(elapsed), 3)
+    durations = [
+        result.duration_seconds
+        for round_report in report.rounds
+        for result in round_report.test_results
+        if result.duration_seconds
+    ]
+    return round(sum(durations), 3) if durations else None
+
+
+def _average_test_seconds(report: DiagnosticReport, total_elapsed: float | None) -> float | None:
+    durations = [
+        result.duration_seconds
+        for round_report in report.rounds
+        for result in round_report.test_results
+        if result.duration_seconds
+    ]
+    if durations:
+        return round(sum(durations) / len(durations), 3)
+    test_count = report.pass_count + report.fail_count
+    if total_elapsed is not None and test_count:
+        return round(total_elapsed / test_count, 3)
+    return None
+
+
+def _slowest_test_items(report: DiagnosticReport) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    summary = report.time_cost_summary
+    by_type = getattr(summary, "slowest_tests_by_failure_type", {}) if summary is not None else {}
+    if isinstance(by_type, dict):
+        for failure_type, entries in by_type.items():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                test_id = entry.get("test_id")
+                duration = _to_optional_float(entry.get("duration_seconds"))
+                if test_id and duration is not None:
+                    items.append(
+                        {
+                            "test_id": str(test_id),
+                            "duration_seconds": round(duration, 3),
+                            "failure_type": str(failure_type),
+                        }
+                    )
+    if not items:
+        for round_report in report.rounds:
+            for result in round_report.test_results:
+                if result.duration_seconds:
+                    items.append(
+                        {
+                            "test_id": result.test_case_id,
+                            "duration_seconds": round(result.duration_seconds, 3),
+                            "failure_type": None,
+                        }
+                    )
+    return sorted(items, key=lambda item: (-float(item["duration_seconds"]), str(item["test_id"])))
+
+
+def _round_elapsed_seconds(round_report: DiagnosticRound) -> float | None:
+    try:
+        started = datetime.fromisoformat(round_report.started_at.replace("Z", "+00:00"))
+        finished = datetime.fromisoformat(round_report.finished_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return round(max(0.0, (finished - started).total_seconds()), 3)
+
+
+def _to_optional_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_seconds(value: float | None) -> str:
+    if value is None:
+        return "unavailable"
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
 def _build_report(
     *,
     mode: DiagnosticMode,
@@ -1634,13 +1800,18 @@ def _build_report(
     overfitting_warning: str | None = None,
     efficiency_warning: str | None = None,
     budget_summary: dict[str, Any] | None = None,
+    overall_confidence_override: float | None = None,
 ) -> DiagnosticReport:
     findings = [finding for round_report in rounds for finding in round_report.findings]
     all_results = [result for round_report in rounds for result in round_report.test_results]
     pass_count = sum(1 for result in all_results if result.passed)
     fail_count = sum(1 for result in all_results if not result.passed)
     warning_count = sum(result.warning_count for result in all_results)
-    overall_confidence = rounds[-1].confidence if rounds else 0.0
+    overall_confidence = (
+        overall_confidence_override
+        if overall_confidence_override is not None
+        else rounds[-1].confidence if rounds else 0.0
+    )
     taxonomy_summary = FindingAggregator().aggregate(findings)
     durations: dict[str, float] = {}
     for result in all_results:
