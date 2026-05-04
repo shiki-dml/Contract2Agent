@@ -36,6 +36,7 @@ nav:
       - Development Guide: development.md
       - Audits:
           - 2026-05-04 Bug Audit: audits/2026-05-04-bug-audit.md
+          - 2026-05-04 Test System Audit: audits/2026-05-04-test-system-audit.md
 
 markdown_extensions:
   - admonition

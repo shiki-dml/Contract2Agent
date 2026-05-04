@@ -12,16 +12,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_github_pages_entrypoint_references_existing_static_assets() -> None:
-    index = ROOT / "docs" / "index.html"
-    html = index.read_text(encoding="utf-8")
+    playground = ROOT / "docs" / "playground.md"
+    demo_html = ROOT / "docs" / "assets" / "contract2agent-demo.html"
+    playground_markdown = playground.read_text(encoding="utf-8")
+    html = demo_html.read_text(encoding="utf-8")
+
+    assert "../assets/contract2agent-demo.html" in playground_markdown
 
     for asset in (
-        "assets/styles.css",
-        "assets/app.js",
-        "assets/contract2agent-preview.svg",
+        "styles.css",
+        "app.js",
+        "contract2agent-preview.svg",
     ):
         assert asset in html
-        assert (index.parent / asset).exists(), asset
+        assert (demo_html.parent / asset).exists(), asset
 
     assert "Contract2Agent" in html
     assert "not legal advice" in html
@@ -30,11 +34,14 @@ def test_github_pages_entrypoint_references_existing_static_assets() -> None:
 
 def test_github_pages_entrypoint_uses_deployable_relative_assets() -> None:
     docs_root = ROOT / "docs"
-    index = docs_root / "index.html"
-    html = index.read_text(encoding="utf-8")
+    playground = docs_root / "playground.md"
+    demo_html = docs_root / "assets" / "contract2agent-demo.html"
+    html = demo_html.read_text(encoding="utf-8")
     css = (docs_root / "assets" / "styles.css").read_text(encoding="utf-8")
 
-    assert index.exists()
+    assert playground.exists()
+    assert not (docs_root / "index.html").exists()
+    assert demo_html.exists()
     assert "localhost" not in html
     assert "127.0.0.1" not in html
     assert "C:\\" not in html
@@ -43,7 +50,7 @@ def test_github_pages_entrypoint_uses_deployable_relative_assets() -> None:
 
     for asset in _html_asset_refs(html):
         assert not asset.startswith(("/", "C:\\"))
-        assert (docs_root / asset).exists(), asset
+        assert (demo_html.parent / asset).exists(), asset
 
     for asset in _css_asset_refs(css):
         assert not asset.startswith(("/", "C:\\"))
@@ -51,7 +58,9 @@ def test_github_pages_entrypoint_uses_deployable_relative_assets() -> None:
 
 
 def test_github_pages_form_contains_required_dispute_inputs() -> None:
-    html = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    html = (ROOT / "docs" / "assets" / "contract2agent-demo.html").read_text(
+        encoding="utf-8"
+    )
 
     required_ids = {
         "contract-text",
@@ -229,7 +238,7 @@ def test_readme_explains_evaluation_first_design() -> None:
         "CLI smoke tests",
         "GitHub Pages static tests",
         "python -m pytest",
-        "docs/index.html",
+        "docs/playground.md",
         "Copy Test Case JSON",
     ):
         assert required in readme
