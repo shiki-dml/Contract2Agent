@@ -199,6 +199,77 @@ POSITIVE_FORCE_MAJEURE_DELIVERY_FIXTURE = {
 }
 
 
+REFUND_TERMINATION_ACCEPTANCE_FIXTURE = {
+    "contractType": "Service Agreement",
+    "disputeType": "Refund / Termination / Acceptance",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Evidence-first",
+    "desiredOutcome": "Assess refund, termination timing, acceptance, and damages limits.",
+    "contractText": (
+        "Customer paid a $60,000 prepaid implementation fee for onboarding services. "
+        "The prepaid implementation fee is non-refundable except that Customer may "
+        "receive a pro-rata refund after Provider's uncured material breach. Customer "
+        "must send written breach notice to the SOW notice contacts and allow a 15-day "
+        "cure period. Notices are deemed received on the next business day after "
+        "sending.\n\n"
+        "The SOW requires Provider to complete the data import milestone by March 15. "
+        "The SOW also requires Provider to complete the administrator training "
+        "milestone by March 25. Any delivery package requesting formal milestone "
+        "acceptance must be reviewed within a 5-business-day rejection period. Any "
+        "rejection must identify material defects with reasonable specificity.\n\n"
+        "Consequential damages and lost-profit damages are excluded. Total liability is "
+        "capped at fees paid during the six months before the event. Provider's "
+        "indemnity obligation applies only to third-party IP infringement claims. Force "
+        "majeure excuses performance only for external uncontrollable events."
+    ),
+    "disputeDescription": (
+        "Customer paid the $60,000 prepaid implementation fee on March 5. Customer says "
+        "Provider missed the March 15 data import milestone and the March 25 "
+        "administrator training milestone. Provider sent a partial data import delivery "
+        "package on March 28. Customer sent an April 2 breach notice and terminated on "
+        "April 20 after the cure period. Provider responded on April 10 that the March "
+        "28 partial delivery substantially completed onboarding services. Customer seeks "
+        "a $42,000 pro-rata refund plus lost productivity and internal delay costs. The "
+        "parties dispute whether the March 28 package requested formal milestone "
+        "acceptance and whether any rejection was timely and specific. No party seeks "
+        "indemnity, and there is no third-party IP or infringement claim. There is no "
+        "confidentiality dispute and no party invokes force majeure."
+    ),
+    "claimantPosition": (
+        "Customer says missed milestones and uncured breach justify termination and a "
+        "$42,000 pro-rata refund. Customer also claims lost productivity from internal "
+        "onboarding delays."
+    ),
+    "respondentPosition": (
+        "Provider says the March 28 partial data import substantially completed the "
+        "onboarding services, the April 2 breach notice was defective or not sent to "
+        "the required SOW notice contacts, any rejection was untimely or nonspecific, "
+        "and any recovery is limited by the non-refundable fee language, damages "
+        "exclusions, and six-month fee liability cap."
+    ),
+    "evidence": (
+        "Available:\n"
+        "- March 5 payment receipt for the $60,000 prepaid implementation fee\n"
+        "- SOW milestone schedule listing March 15 data import and March 25 administrator training\n"
+        "- March 28 partial data import delivery package\n"
+        "- April 2 customer breach notice\n"
+        "- April 10 provider response email\n"
+        "- April 20 termination email\n\n"
+        "Missing or unclear:\n"
+        "- Statement of work notice contact list\n"
+        "- Proof that the April 2 breach notice was sent to the contractual notice contacts\n"
+        "- Whether the March 28 delivery package requested formal milestone acceptance\n"
+        "- Whether the customer rejected within 5 business days\n"
+        "- Whether rejection identified material defects with reasonable specificity\n"
+        "- Detailed work-completion records showing performed vs unperformed services\n"
+        "- Basis for the $42,000 pro-rata refund calculation\n"
+        "- Evidence supporting lost productivity damages"
+    ),
+    "metadata": '{"project":"onboarding","payment":"prepaid"}',
+}
+
+
 def test_github_pages_entrypoint_references_existing_static_assets() -> None:
     demo_html = ROOT / "docs" / "playground" / "index.html"
     html = demo_html.read_text(encoding="utf-8")
@@ -625,6 +696,194 @@ def test_playground_positive_force_majeure_next_steps_and_exports_are_scoped() -
     assert exported["timeline_facts"] == output["diagnosis"]["timeline_facts"]
     assert "SLA/Service Credit" not in markdown
     assert "Whether the alleged service-impact period downtime qualifies" not in markdown
+
+
+def test_playground_refund_termination_filters_false_positive_issue_families() -> None:
+    diagnosis = _run_playground_diagnosis(
+        REFUND_TERMINATION_ACCEPTANCE_FIXTURE
+    )["diagnosis"]
+    active_tags = {tag.lower() for tag in diagnosis["active_issue_tags"]}
+
+    for expected in (
+        "refund",
+        "prepaid fees",
+        "termination",
+        "notice",
+        "cure period",
+        "delivery",
+        "acceptance / rejection",
+        "damages",
+        "liability limitation",
+    ):
+        assert expected in active_tags
+
+    for forbidden in (
+        "indemnity",
+        "confidentiality",
+        "force majeure",
+        "intellectual property",
+        "sla",
+        "service credit",
+        "suspension",
+        "invoice dispute",
+    ):
+        assert forbidden not in active_tags
+
+    assert "Payment/Invoice Dispute" not in diagnosis["dispute_type"]
+    for expected_type in (
+        "Notice/Cure Period",
+        "Termination",
+        "Refund",
+        "Acceptance/Rejection",
+        "Damages/Liability",
+    ):
+        assert expected_type in diagnosis["dispute_type"]
+
+
+def test_playground_refund_termination_clause_signals_are_clause_only_scoped() -> None:
+    diagnosis = _run_playground_diagnosis(
+        REFUND_TERMINATION_ACCEPTANCE_FIXTURE
+    )["diagnosis"]
+    clause_text = "\n".join(diagnosis["clause_signals"])
+
+    for expected_clause in (
+        "prepaid implementation fee",
+        "non-refundable fee provision",
+        "pro-rata refund after uncured breach",
+        "written breach notice",
+        "15-day cure period",
+        "milestone acceptance",
+        "5-business-day rejection period",
+        "reasonable specificity for defect rejection",
+        "consequential damages exclusion",
+        "lost-profit damages exclusion",
+        "six-month fee liability cap",
+        "indemnity clause mentioned but not fact-triggered",
+        "force majeure clause mentioned but not fact-triggered",
+    ):
+        assert expected_clause in clause_text
+
+    for forbidden_clause in (
+        "confidentiality obligations",
+        "SLA/service credit",
+        "suspension rights",
+    ):
+        assert forbidden_clause not in clause_text
+
+
+def test_playground_refund_termination_key_issues_and_timeline_are_case_specific() -> None:
+    diagnosis = _run_playground_diagnosis(
+        REFUND_TERMINATION_ACCEPTANCE_FIXTURE
+    )["diagnosis"]
+    key_issue_text = "\n".join(diagnosis["key_issues"])
+    timeline_text = "\n".join(diagnosis["timeline_facts"])
+
+    for required in (
+        "March 15 data import milestone and March 25 administrator training milestone",
+        "March 28 partial data import",
+        "April 2 breach notice",
+        "15-day cure period expired before the April 20 termination",
+        "March 28 delivery package requested formal milestone acceptance",
+        "rejected the March 28 delivery within the 5-business-day rejection period",
+        "material defects with reasonable specificity",
+        "prepaid $60,000 implementation fee",
+        "$42,000 refund calculation",
+        "lost productivity or internal delay costs",
+        "six-month fee liability cap",
+    ):
+        assert required in key_issue_text
+
+    for forbidden in (
+        "unpaid invoice",
+        "identified invoices were unpaid and overdue",
+        "revised package revised package",
+        "production-ready delivery milestone",
+        "service credit",
+        "suspension",
+        "lost revenue",
+    ):
+        assert forbidden not in key_issue_text
+
+    for expected_timeline in (
+        "March 5: customer paid $60,000 prepaid implementation fee.",
+        "March 15: data import milestone.",
+        "March 25: administrator training milestone.",
+        "March 28: provider partial delivery.",
+        "April 2: customer breach notice.",
+        "April 10: provider response.",
+        "April 20: customer termination.",
+        "15-day cure period: calculate from deemed receipt of April 2 notice.",
+        "5-business-day rejection period: calculate from March 28 delivery only if acceptance was requested.",
+    ):
+        assert expected_timeline in timeline_text
+
+    march_28_lines = [
+        line for line in diagnosis["timeline_facts"] if "March 28" in line
+    ]
+    assert any("provider partial delivery" in line for line in march_28_lines)
+    assert all(
+        not (line.startswith("March 28:") and "rejection" in line.lower())
+        for line in march_28_lines
+    )
+
+
+def test_playground_refund_termination_gaps_next_steps_and_exports_are_scoped() -> None:
+    output = _run_playground_diagnosis(REFUND_TERMINATION_ACCEPTANCE_FIXTURE)
+    exported = json.loads(output["json"])
+    markdown = output["markdown"]
+    gaps = "\n".join(exported["evidence_gaps"])
+    next_steps = "\n".join(exported["suggested_next_steps"])
+
+    for expected_gap in (
+        "Statement of work notice contact list",
+        "Proof that the April 2 breach notice was sent to the contractual notice contacts",
+        "Whether the March 28 delivery package requested formal milestone acceptance",
+        "Whether the customer rejected within 5 business days",
+        "Whether rejection identified material defects with reasonable specificity",
+        "Detailed work-completion records showing performed vs unperformed services",
+        "Basis for the $42,000 pro-rata refund calculation",
+        "Evidence supporting lost productivity damages",
+    ):
+        assert expected_gap in gaps
+
+    for forbidden_gap in (
+        "invoice receipt dates",
+        "invoice dispute notice",
+        "disputed vs undisputed invoice amounts",
+    ):
+        assert forbidden_gap not in gaps.lower()
+
+    for expected_step in (
+        "Build a March 5 / March 15 / March 25 / March 28 / April 2 / April 10 / April 20 timeline.",
+        "Verify SOW notice contacts.",
+        "Verify proof of April 2 breach notice delivery.",
+        "Calculate deemed receipt and 15-day cure deadline.",
+        "Determine whether the March 28 delivery requested formal acceptance.",
+        "Determine whether the customer rejected within 5 business days.",
+        "Review whether rejection identified material defects with reasonable specificity.",
+        "Compare performed vs unperformed service records.",
+        "Validate the $42,000 pro-rata refund calculation.",
+        "Review consequential damages, lost-profit exclusion, and six-month fee liability cap.",
+        "Verify evidence supporting lost productivity damages.",
+    ):
+        assert expected_step in next_steps
+
+    for forbidden_step in (
+        "invoice receipt",
+        "invoice dispute",
+        "disputed amounts",
+        "suspension",
+        "service credit",
+    ):
+        assert forbidden_step not in next_steps.lower()
+
+    assert exported["active_issue_tags"] == output["diagnosis"]["active_issue_tags"]
+    assert exported["clause_signals"] == output["diagnosis"]["clause_signals"]
+    assert exported["timeline_facts"] == output["diagnosis"]["timeline_facts"]
+    assert "Payment/Invoice Dispute" not in markdown
+    assert "indemnity" not in "\n".join(exported["active_issue_tags"]).lower()
+    assert "confidentiality" not in "\n".join(exported["active_issue_tags"]).lower()
+    assert "service-credit" not in "\n".join(exported["risk"]["rationale"]).lower()
 
 
 def test_mkdocs_nav_preserves_github_pages_playground_route() -> None:

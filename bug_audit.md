@@ -1,5 +1,74 @@
 # Contract2Agent Bug Audit
 
+## 2026-05-04 Refund / Termination / Acceptance Template Contamination Follow-Up
+
+### 1. Remaining issue
+
+- The prior force-majeure follow-up fixed clause-only force majeure handling, but a refund / termination / acceptance case still received unrelated active issue families and stale templates.
+- The analyzer could incorrectly:
+  - activate `indemnity` when the facts expressly denied any third-party IP or infringement claim.
+  - activate or signal `confidentiality` because substring matching treated `non-refundable` as containing `nda`.
+  - convert a prepaid-fee refund dispute into `Payment/Invoice Dispute`.
+  - generate unpaid-invoice, suspension, service-credit, stale delivery, and lost-revenue wording.
+  - classify March 28 as rejection context and April 2 as a delivery-delay notice instead of provider partial delivery and customer breach notice.
+
+### 2. Root cause
+
+- Active issue tags still relied on broad keyword groups and clause mentions instead of factual invocation.
+- Invoice-dispute detection treated generic fee/refund disputes as invoice disputes.
+- Indemnity and confidentiality lacked required factual triggers and negative context guards.
+- Timeline and next-step generation did not have a scoped refund / termination / acceptance path, so generic payment, suspension, and delivery templates could leak.
+
+### 3. Files changed
+
+- `docs/assets/app.js`
+  - Added factual trigger guards for invoice disputes, indemnity, and confidentiality.
+  - Kept indemnity and force majeure as clause-only signals when not fact-triggered.
+  - Added refund / prepaid-fee / acceptance-rejection active tags separate from payment and invoice disputes.
+  - Added refund / termination / acceptance timeline extraction for payment, milestones, delivery, breach notice, response, termination, cure period, and rejection period.
+  - Added scoped key issues, evidence gaps, and suggested next steps for refund / prepaid-fee / acceptance disputes.
+  - Removed service-credit wording from risk/contested-fact rationale unless service-credit is actually active.
+  - Fixed `nda` substring contamination from `non-refundable`.
+- `tests/test_docs_site.py`
+  - Added a refund / termination / acceptance regression fixture.
+  - Added tests for active tag filtering, clause-only signals, case-specific key issues, timeline role classification, evidence gaps, next steps, and Markdown/JSON exports.
+- `bug_audit.md`
+  - Added this follow-up note.
+
+### 4. Tests added
+
+- `test_playground_refund_termination_filters_false_positive_issue_families`
+- `test_playground_refund_termination_clause_signals_are_clause_only_scoped`
+- `test_playground_refund_termination_key_issues_and_timeline_are_case_specific`
+- `test_playground_refund_termination_gaps_next_steps_and_exports_are_scoped`
+
+### 5. Commands run
+
+| Command | Result | Summary |
+| --- | --- | --- |
+| `node --check docs\assets\app.js` | Passed | Static playground JavaScript syntax is valid. |
+| `python -m pytest tests\test_docs_site.py -q` | Passed | 28 passed in 1.30s on the final focused run. |
+| `python -m pytest` | Passed | 241 passed in 21.96s. |
+| `python -m compileall -q contract2agent tests scripts` | Passed | Python syntax compilation succeeded. |
+| `python scripts\check_docs_links.py` | Passed | Checked 26 Markdown files; all relative links resolve. |
+| `python -m mkdocs build --strict` | Passed | Documentation built successfully in 0.69s. |
+| `Test-Path package.json` | No package file | No npm install/test/build/lint/typecheck scripts are present in this repository. |
+
+### 6. Build/test result
+
+- The static playground and `/Contract2Agent/playground/` route remain covered by the existing docs tests and MkDocs strict build.
+- No backend, runtime network call, route, sample-loading, export-button, styling, or unrelated UI change was added.
+- The refund / termination / acceptance fixture now:
+  - excludes indemnity, confidentiality, force majeure, SLA, service credit, suspension, and invoice dispute from active issue tags.
+  - keeps indemnity and force majeure as clause-only signals when not fact-triggered.
+  - separates refund and prepaid-fee analysis from invoice-dispute analysis.
+  - produces case-specific key issues, evidence gaps, timeline facts, suggested next steps, and Markdown/JSON exports.
+
+### 7. Remaining limitations
+
+- The playground remains deterministic and text-pattern based. It now filters each issue family more narrowly, but it still depends on reasonably explicit dates, amounts, clause names, and factual descriptions in the user input.
+- No static reference pack was added in this follow-up; the fix stayed inside the existing checked-in static analyzer.
+
 ## 2026-05-04 Force Majeure Template Contamination Follow-Up
 
 ### 1. Remaining bug

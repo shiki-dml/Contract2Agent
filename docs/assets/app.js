@@ -369,6 +369,42 @@
     return "";
   }
 
+  function findDateAfterWords(text, words) {
+    const segments = findSegmentsNear(text, words);
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      const lower = normalize(segment);
+      let start = -1;
+      words.forEach((word) => {
+        const found = lower.indexOf(normalize(word));
+        if (found !== -1 && (start === -1 || found < start)) {
+          start = found;
+        }
+      });
+      const dates = extractDates(start === -1 ? segment : segment.slice(start));
+      if (dates.length) {
+        return dates[0];
+      }
+    }
+    return "";
+  }
+
+  function extractMoneyAmounts(text) {
+    const matches = String(text || "").match(/\$\s*\d{1,3}(?:,\d{3})*(?:\.\d+)?|\$\s*\d+(?:\.\d+)?/g);
+    return matches ? uniqueValues(matches.map((match) => match.replace(/\$\s+/, "$").trim())) : [];
+  }
+
+  function findMoneyNear(text, words, pick) {
+    const segments = findSegmentsNear(text, words);
+    for (let index = 0; index < segments.length; index += 1) {
+      const amounts = extractMoneyAmounts(segments[index]);
+      if (amounts.length) {
+        return pick === "last" ? amounts[amounts.length - 1] : amounts[0];
+      }
+    }
+    return "";
+  }
+
   function extractPercents(text) {
     const matches = String(text || "").match(/\b\d+(?:\.\d+)?%/g);
     return matches ? uniqueValues(matches) : [];
@@ -479,6 +515,13 @@
     return String(duration || "").trim().replace(/\s+months?\b/i, "-month").replace(/\s+days?\b/i, "-day");
   }
 
+  function durationSentence(duration) {
+    return String(duration || "")
+      .trim()
+      .replace(/\b(\d+)-business-day\b/i, "$1 business days")
+      .replace(/\b(\d+)-day\b/i, "$1 days");
+  }
+
   function extractDeliveryTimeline(data) {
     const facts = factText(data);
     const source = allText(data);
@@ -526,6 +569,24 @@
     };
   }
 
+  function extractRefundTerminationTimeline(data) {
+    const facts = factText(data);
+    const source = allText(data);
+    return {
+      prepaidPaymentDate: findDateInSegment(facts, ["paid", "prepaid implementation fee", "prepaid fee", "payment receipt"], "first"),
+      dataImportMilestoneDate: findDateAfterWords(source, ["data import milestone", "data import"]),
+      trainingMilestoneDate: findDateAfterWords(source, ["administrator training milestone", "admin training milestone", "administrator training", "training milestone"]),
+      partialDeliveryDate: findDateInSegment(facts, ["partial data import", "partial delivery", "delivery package", "provider partial delivery"], "first", ["rejected", "rejection", "breach notice", "notice"]),
+      breachNoticeDate: findDateInSegment(facts, ["breach notice", "notice of breach"], "first"),
+      providerResponseDate: findDateInSegment(facts, ["provider response", "provider responded", "responded", "response"], "first"),
+      terminationDate: findDateInSegment(facts, ["termination", "terminated", "terminate"], "last"),
+      curePeriod: findDurationNear(source, ["cure period", "cure"]),
+      rejectionPeriod: findDurationNear(source, ["rejection period", "business-day rejection", "reject", "rejection", "acceptance"]),
+      prepaidAmount: findMoneyNear(source, ["prepaid implementation fee", "prepaid fee", "paid"], "first"),
+      refundAmount: findMoneyNear(facts, ["refund calculation", "pro-rata refund", "pro rata refund", "refund"], "last")
+    };
+  }
+
   function partyName(data, preferred, fallback) {
     const combined = normalize(allText(data));
     if (combined.includes(preferred)) {
@@ -552,6 +613,124 @@
       return false;
     }
     return hasAny(facts, forceMajeureFactTriggers) || /\bforce majeure\b/i.test(facts);
+  }
+
+  function hasConfidentialityClause(contractText) {
+    const text = normalize(contractText);
+    return (
+      text.includes("confidential") ||
+      text.includes("non-disclosure") ||
+      text.includes("nondisclosure") ||
+      text.includes("disclosure of confidential") ||
+      /\bnda\b/i.test(text)
+    );
+  }
+
+  function hasInvoiceDisputeFactTrigger(data) {
+    const invoiceTriggers = [
+      "invoice dispute notice",
+      "written invoice dispute",
+      "disputed invoice",
+      "disputed invoices",
+      "disputed amount",
+      "dispute the invoice",
+      "disputes an invoice",
+      "invoice was disputed",
+      "invoices were disputed",
+      "unpaid invoice",
+      "unpaid invoices",
+      "overdue invoice",
+      "overdue invoices",
+      "outstanding invoice",
+      "outstanding invoices",
+      "invoice nonpayment",
+      "invoice non-payment",
+      "non-payment of invoice",
+      "nonpayment of invoice",
+      "charge dispute",
+      "overage fees disputed"
+    ];
+    const invoiceDenials = [
+      "no invoice dispute",
+      "not an invoice dispute",
+      "no unpaid invoice",
+      "no unpaid invoices",
+      "no overdue invoice",
+      "no overdue invoices",
+      "already paid",
+      "prepaid"
+    ];
+    return splitSegments(factText(data)).some((segment) => {
+      if (hasAny(segment, invoiceDenials) && hasAny(segment, ["invoice", "invoices", "prepaid", "paid"])) {
+        return false;
+      }
+      return hasAny(segment, invoiceTriggers);
+    });
+  }
+
+  function hasIndemnityFactTrigger(data) {
+    const triggers = [
+      "indemnity demand",
+      "indemnification demand",
+      "indemnify",
+      "defense demand",
+      "demand for defense",
+      "hold harmless",
+      "third-party claim",
+      "third party claim",
+      "third-party demand",
+      "third party demand",
+      "ip infringement",
+      "intellectual property infringement",
+      "infringement claim",
+      "infringement demand"
+    ];
+    const denialSignals = [
+      "no indemnity",
+      "not seeking indemnity",
+      "no indemnification",
+      "no third-party",
+      "no third party",
+      "no ip",
+      "no intellectual property",
+      "no infringement",
+      "no defense demand",
+      "no hold harmless"
+    ];
+    return splitSegments(factText(data)).some((segment) => {
+      if (hasAny(segment, denialSignals) && hasAny(segment, ["indemnity", "indemnification", "third-party", "third party", "ip", "intellectual property", "infringement", "defense", "hold harmless"])) {
+        return false;
+      }
+      return hasAny(segment, triggers);
+    });
+  }
+
+  function hasConfidentialityFactTrigger(data) {
+    const triggers = [
+      "confidential information",
+      "confidentiality breach",
+      "breach of confidentiality",
+      "unauthorized disclosure",
+      "disclosed confidential",
+      "misuse of confidential",
+      "nda breach",
+      "data leak",
+      "data leakage",
+      "leaked confidential"
+    ];
+    const denialSignals = [
+      "no confidentiality dispute",
+      "no confidentiality breach",
+      "no confidential information",
+      "no disclosure",
+      "not a confidentiality dispute"
+    ];
+    return splitSegments(factText(data)).some((segment) => {
+      if (hasAny(segment, denialSignals)) {
+        return false;
+      }
+      return hasAny(segment, triggers);
+    });
   }
 
   function hasExternalEventDenial(text) {
@@ -590,18 +769,14 @@
     const lowerFacts = normalize(facts);
     const dispute = normalize(data.disputeType);
     const contract = normalize(data.contractType);
-    const invoiceWords = ["invoice", "invoices", "fees", "amount", "overage"];
-    const disputeWords = ["disputed", "dispute", "objected", "objection"];
 
     return {
       payment:
         dispute.includes("payment") ||
         hasAny(facts, ["unpaid", "overdue", "non-payment", "nonpayment", "failed to pay", "outstanding invoice", "outstanding invoices", "fees were due"]),
-      invoiceDispute:
-        (hasAny(facts, disputeWords) && hasAny(facts, invoiceWords)) ||
-        hasAny(facts, ["invoice dispute notice", "disputed invoice", "disputed invoices", "disputed amount", "overage fees disputed"]),
+      invoiceDispute: hasInvoiceDisputeFactTrigger(data),
       notice:
-        hasAny(facts, ["written notice", "non-payment notice", "nonpayment notice", "notice of breach", "notice of non-payment", "delivery delay notice", "delay notice", "force majeure notice", "reminder email", "notice was vague", "notice was sent", "notice contacts"]),
+        hasAny(facts, ["written notice", "non-payment notice", "nonpayment notice", "notice of breach", "breach notice", "notice of non-payment", "delivery delay notice", "delay notice", "force majeure notice", "reminder email", "notice was vague", "notice was sent", "notice contacts"]),
       cure:
         hasAny(facts, ["cure period", "failed to cure", "failure to cure", "waited", "days before suspension", "days before termination"]),
       suspension:
@@ -612,6 +787,12 @@
         dispute.includes("delivery") || hasAny(facts, ["delivery", "shipment", "milestone", "acceptance", "delayed", "late"]),
       refund:
         dispute.includes("refund") || hasAny(facts, ["refund", "refundable", "prepaid"]),
+      prepaidFees:
+        hasAny(facts, ["prepaid fee", "prepaid fees", "prepaid implementation fee", "implementation fee", "payment receipt"]),
+      acceptanceRejection:
+        hasAny(facts, ["acceptance", "formal acceptance", "milestone acceptance", "accepted", "rejected", "rejection", "5-business-day rejection", "reasonable specificity"]),
+      milestonePerformance:
+        hasAny(facts, ["milestone", "data import", "administrator training", "admin training", "onboarding services", "partial delivery", "partial data import"]),
       service:
         contract.includes("saas") || hasAny(facts, ["platform access", "service access", "uptime", "downtime", "sla", "service credit", "support ticket"]),
       sla:
@@ -625,11 +806,11 @@
       coverCosts:
         hasAny(facts, ["cover cost", "cover costs", "temporary consultant", "consultant cost", "consultant retained", "replacement vendor"]),
       damages:
-        hasAny(facts, ["damages", "liquidated damages", "lost revenue", "lost profits", "operational losses", "replacement costs", "beyond service credits", "loss calculation", "claimed revenue"]),
+        hasAny(facts, ["damages", "liquidated damages", "lost revenue", "lost productivity", "internal delay costs", "lost profits", "operational losses", "replacement costs", "beyond service credits", "loss calculation", "claimed revenue", "refund calculation"]),
       liabilityLimitation:
-        hasAny(facts, ["liability cap", "limitation of liability", "consequential damages", "lost revenue exclusion", "lost-profit", "lost profit", "damages beyond", "fees paid", "cap"]),
-      indemnity:
-        hasAny(facts, ["indemnity", "indemnify", "third-party claim", "third party claim"]),
+        hasAny(facts, ["liability cap", "limitation of liability", "consequential damages", "lost revenue exclusion", "lost productivity", "internal delay costs", "lost-profit", "lost profit", "damages beyond", "fees paid", "cap"]),
+      indemnity: hasIndemnityFactTrigger(data),
+      confidentiality: hasConfidentialityFactTrigger(data),
       penalty:
         hasAny(facts, ["penalty", "liquidated damages", "late fee penalty"]),
       forceMajeure: hasForceMajeureFactTrigger(data),
@@ -660,6 +841,10 @@
     }
     if (hasAny(contractText, ["cure period", "days to cure", "cure"])) {
       addUnique(signals, "cure period");
+      const curePeriod = findDurationNear(data.contractText, ["cure period", "days to cure", "cure"]);
+      if (curePeriod) {
+        addUnique(signals, `${curePeriod} cure period`);
+      }
     }
     if (hasAny(contractText, ["suspend", "suspension", "suspend access", "affected services"])) {
       addUnique(signals, "suspension rights");
@@ -700,7 +885,12 @@
       }
     }
     if (hasAny(contractText, ["indemnity", "indemnify"])) {
-      addUnique(signals, "indemnity");
+      addUnique(
+        signals,
+        hasIndemnityFactTrigger(data)
+          ? "indemnity clause"
+          : "indemnity clause mentioned but not fact-triggered"
+      );
     }
     if (hasAny(contractText, ["force majeure"])) {
       addUnique(
@@ -733,6 +923,28 @@
     if (hasAny(contractText, ["review period", "business-day review", "business day review", "inspect", "inspection"])) {
       addUnique(signals, "review/inspection period");
     }
+    if (hasAny(contractText, ["prepaid implementation fee", "prepaid fee", "prepaid fees"])) {
+      addUnique(signals, "prepaid implementation fee");
+    }
+    if (hasAny(contractText, ["non-refundable", "non refundable", "nonrefundable"])) {
+      addUnique(signals, "non-refundable fee provision");
+    }
+    if (hasAny(contractText, ["pro-rata refund", "pro rata refund", "refundable pro rata", "refund after uncured breach", "uncured breach"])) {
+      addUnique(signals, "pro-rata refund after uncured breach");
+    }
+    if (hasAny(contractText, ["written breach notice", "notice of breach", "breach notice"])) {
+      addUnique(signals, "written breach notice");
+    }
+    if (hasAny(contractText, ["milestone acceptance", "formal milestone acceptance", "formal acceptance"])) {
+      addUnique(signals, "milestone acceptance");
+    }
+    if (hasAny(contractText, ["business-day rejection", "business day rejection", "rejection period", "reject within"])) {
+      const rejectionPeriod = findDurationNear(data.contractText, ["business-day rejection", "business day rejection", "rejection period", "reject", "rejection"]);
+      addUnique(signals, rejectionPeriod ? `${rejectionPeriod} rejection period` : "rejection period");
+    }
+    if (hasAny(contractText, ["reasonable specificity", "reasonably specific", "specificity for defect", "material defects"])) {
+      addUnique(signals, "reasonable specificity for defect rejection");
+    }
     if (hasAny(contractText, ["acceptance", "specification"])) {
       addUnique(signals, "delivery and acceptance criteria");
     } else if (hasAny(contractText, ["delivery", "shipment", "milestone"])) {
@@ -741,7 +953,7 @@
     if (hasAny(contractText, ["terminate", "termination", "cancel", "cancellation"])) {
       addUnique(signals, "termination rights");
     }
-    if (hasAny(contractText, ["confidential", "nda", "disclosure"])) {
+    if (hasConfidentialityClause(contractText)) {
       addUnique(signals, "confidentiality obligations");
     }
     if (hasAny(contractText, ["refund", "non-refundable", "refundable"])) {
@@ -755,11 +967,17 @@
     const groups = detectGroups(data);
     const tags = [];
 
-    if ((triggers.payment || triggers.invoiceDispute || triggers.refund) && (hasSignal(clauseSignals, "payment") || groups.includes("payment"))) {
+    if ((triggers.payment || triggers.invoiceDispute) && (hasSignal(clauseSignals, "payment") || groups.includes("payment"))) {
       addUnique(tags, "payment");
     }
     if (triggers.invoiceDispute && (hasSignal(clauseSignals, "disputed invoice") || hasSignal(clauseSignals, "payment") || groups.includes("payment"))) {
       addUnique(tags, "invoice dispute");
+    }
+    if (triggers.refund && (hasSignal(clauseSignals, "refund") || hasSignal(clauseSignals, "prepaid") || groups.includes("payment"))) {
+      addUnique(tags, "refund");
+    }
+    if (triggers.prepaidFees && (hasSignal(clauseSignals, "prepaid") || hasSignal(clauseSignals, "non-refundable") || hasSignal(clauseSignals, "refund"))) {
+      addUnique(tags, "prepaid fees");
     }
     if ((triggers.notice || triggers.suspension || triggers.termination) && (hasSignal(clauseSignals, "notice") || hasSignal(clauseSignals, "deemed receipt") || groups.includes("notice"))) {
       addUnique(tags, "notice");
@@ -775,6 +993,9 @@
     }
     if (triggers.delivery && (hasSignal(clauseSignals, "delivery") || groups.includes("delivery"))) {
       addUnique(tags, "delivery");
+    }
+    if (triggers.acceptanceRejection && (hasSignal(clauseSignals, "acceptance") || hasSignal(clauseSignals, "rejection") || hasSignal(clauseSignals, "specificity"))) {
+      addUnique(tags, "acceptance / rejection");
     }
     if (triggers.sla && (hasSignal(clauseSignals, "SLA") || hasSignal(clauseSignals, "uptime"))) {
       addUnique(tags, "SLA");
@@ -803,7 +1024,7 @@
     if (triggers.forceMajeure && hasSignal(clauseSignals, "force majeure")) {
       addUnique(tags, "force majeure");
     }
-    if (groups.includes("confidentiality")) {
+    if (triggers.confidentiality && hasSignal(clauseSignals, "confidentiality")) {
       addUnique(tags, "confidentiality");
     }
 
@@ -856,6 +1077,11 @@
     const combined = normalize(allText(data));
     const evidence = normalize(data.evidence);
     const gaps = extractExplicitEvidenceGaps(data.evidence);
+    const refundTimeline = extractRefundTerminationTimeline(data);
+    const refundAcceptanceIssue =
+      hasTag(activeIssueTags, "refund") ||
+      hasTag(activeIssueTags, "prepaid fees") ||
+      hasTag(activeIssueTags, "acceptance / rejection");
 
     if (!hasAny(combined, ["signed", "executed", "agreement", "purchase order", "order form"])) {
       addUnique(gaps, "signed agreement or executed contract copy");
@@ -884,7 +1110,33 @@
     if (hasTag(activeIssueTags, "SLA") && !hasAny(evidence, ["independent monitoring", "timestamped sla", "timestamped monitoring", "third-party monitoring"])) {
       addUnique(gaps, "independent or timestamped SLA monitoring data");
     }
-    if ((hasTag(activeIssueTags, "damages") || hasTag(activeIssueTags, "liability limitation")) && !hasAny(evidence, ["damages calculation", "lost revenue calculation", "loss calculation", "replacement cost", "itemized refund"])) {
+    if (refundAcceptanceIssue) {
+      if (hasSignal(clauseSignals, "notice contacts") && !hasAny(evidence, ["sow notice contacts", "statement of work notice", "notice contact list"])) {
+        addUnique(gaps, "Statement of work notice contact list");
+      }
+      if (refundTimeline.breachNoticeDate && !hasAny(evidence, ["proof", "delivery receipt", "email delivery log", "sent to the contractual notice contacts"])) {
+        addUnique(gaps, `Proof that the ${refundTimeline.breachNoticeDate} breach notice was sent to the contractual notice contacts`);
+      }
+      if (hasSignal(clauseSignals, "milestone acceptance") && !hasAny(evidence, ["formal milestone acceptance", "requested formal acceptance", "acceptance request"])) {
+        const deliveryDate = refundTimeline.partialDeliveryDate || "delivery";
+        addUnique(gaps, `Whether the ${deliveryDate} delivery package requested formal milestone acceptance`);
+      }
+      if (hasSignal(clauseSignals, "rejection period") && !hasAny(evidence, ["rejected within", "timely rejection", "rejection email"])) {
+        addUnique(gaps, "Whether the customer rejected within 5 business days");
+      }
+      if (hasSignal(clauseSignals, "specificity") && !hasAny(evidence, ["specificity", "material defects", "defect list", "defect detail"])) {
+        addUnique(gaps, "Whether rejection identified material defects with reasonable specificity");
+      }
+      if (!hasAny(evidence, ["work-completion", "work completion", "performed vs unperformed", "completion records", "service records"])) {
+        addUnique(gaps, "Detailed work-completion records showing performed vs unperformed services");
+      }
+      if (refundTimeline.refundAmount && !hasAny(evidence, ["refund calculation", "pro-rata refund calculation", "pro rata refund calculation"])) {
+        addUnique(gaps, `Basis for the ${refundTimeline.refundAmount} pro-rata refund calculation`);
+      }
+      if (hasAny(combined, ["lost productivity", "internal delay"]) && !hasAny(evidence, ["lost productivity", "internal delay"])) {
+        addUnique(gaps, "Evidence supporting lost productivity damages");
+      }
+    } else if ((hasTag(activeIssueTags, "damages") || hasTag(activeIssueTags, "liability limitation")) && !hasAny(evidence, ["damages calculation", "lost revenue calculation", "loss calculation", "replacement cost", "itemized refund"])) {
       addUnique(gaps, "damages calculation or lost revenue calculation");
     }
     if (triggers.customerSideCause && !hasAny(evidence, ["integration error logs", "api authentication", "customer-side logs", "customer side logs"])) {
@@ -903,21 +1155,55 @@
     const servicePeriods = extractServicePeriods(data);
     const deliveryTimeline = extractDeliveryTimeline(data);
     const fmTimeline = extractForceMajeureTimeline(data);
+    const refundTimeline = extractRefundTerminationTimeline(data);
     const paymentDeadline = findDurationNear(contractText, ["pay", "payment", "invoice", "fees"]);
     const disputeDeadline = findDurationNear(contractText, ["disputes an invoice", "disputed amount", "basis for dispute"]);
     const cureDuration = findDurationNear(contractText, ["cure"]);
     const timeline = [];
+    const refundAcceptanceIssue =
+      hasTag(activeIssueTags, "refund") ||
+      hasTag(activeIssueTags, "prepaid fees") ||
+      hasTag(activeIssueTags, "acceptance / rejection");
 
     if ((hasTag(activeIssueTags, "payment") || hasTag(activeIssueTags, "invoice dispute")) && invoiceDates.length) {
       addUnique(timeline, `Invoice dates identified: ${formatList(invoiceDates)}.`);
     }
-    if (paymentDeadline) {
+    if ((hasTag(activeIssueTags, "payment") || hasTag(activeIssueTags, "invoice dispute")) && paymentDeadline) {
       addUnique(timeline, `Payment deadline signal: undisputed invoices due within ${paymentDeadline} of receipt or the contract trigger.`);
     }
-    if (disputeDeadline) {
+    if (hasTag(activeIssueTags, "invoice dispute") && disputeDeadline) {
       addUnique(timeline, `Invoice dispute deadline signal: written dispute notice due within ${disputeDeadline} of invoice receipt or discovery.`);
     }
-    if (hasTag(activeIssueTags, "force majeure")) {
+    if (refundAcceptanceIssue) {
+      if (refundTimeline.prepaidPaymentDate) {
+        const amount = refundTimeline.prepaidAmount ? ` ${refundTimeline.prepaidAmount}` : "";
+        addUnique(timeline, `${refundTimeline.prepaidPaymentDate}: customer paid${amount} prepaid implementation fee.`);
+      }
+      if (refundTimeline.dataImportMilestoneDate) {
+        addUnique(timeline, `${refundTimeline.dataImportMilestoneDate}: data import milestone.`);
+      }
+      if (refundTimeline.trainingMilestoneDate) {
+        addUnique(timeline, `${refundTimeline.trainingMilestoneDate}: administrator training milestone.`);
+      }
+      if (refundTimeline.partialDeliveryDate) {
+        addUnique(timeline, `${refundTimeline.partialDeliveryDate}: provider partial delivery.`);
+      }
+      if (refundTimeline.breachNoticeDate) {
+        addUnique(timeline, `${refundTimeline.breachNoticeDate}: customer breach notice.`);
+      }
+      if (refundTimeline.providerResponseDate) {
+        addUnique(timeline, `${refundTimeline.providerResponseDate}: provider response.`);
+      }
+      if (refundTimeline.terminationDate) {
+        addUnique(timeline, `${refundTimeline.terminationDate}: customer termination.`);
+      }
+      if (refundTimeline.curePeriod && refundTimeline.breachNoticeDate) {
+        addUnique(timeline, `${refundTimeline.curePeriod} cure period: calculate from deemed receipt of ${refundTimeline.breachNoticeDate} notice.`);
+      }
+      if (refundTimeline.rejectionPeriod && refundTimeline.partialDeliveryDate) {
+        addUnique(timeline, `${refundTimeline.rejectionPeriod} rejection period: calculate from ${refundTimeline.partialDeliveryDate} delivery only if acceptance was requested.`);
+      }
+    } else if (hasTag(activeIssueTags, "force majeure")) {
       if (fmTimeline.governmentOrderDate) {
         addUnique(timeline, `${fmTimeline.governmentOrderDate}: government emergency order issued.`);
       }
@@ -948,10 +1234,10 @@
     if (cureDuration) {
       addUnique(timeline, `Cure period length identified: ${cureDuration}.`);
     }
-    if (actionDates.length) {
+    if (actionDates.length && !refundAcceptanceIssue) {
       addUnique(timeline, `Suspension or termination action date identified: ${formatList(actionDates)}.`);
     }
-    if (hasTag(activeIssueTags, "delivery")) {
+    if (hasTag(activeIssueTags, "delivery") && !refundAcceptanceIssue) {
       if (deliveryTimeline.milestoneDate) {
         addUnique(timeline, `Delivery milestone date identified: ${deliveryTimeline.milestoneDate}.`);
       }
@@ -971,7 +1257,7 @@
         addUnique(timeline, `Review or inspection period identified: ${deliveryTimeline.reviewPeriod}.`);
       }
     }
-    if (noticeDates.length && cureDuration && actionDates.length) {
+    if (noticeDates.length && cureDuration && actionDates.length && !refundAcceptanceIssue) {
       addUnique(timeline, `Cure deadline must be calculated from deemed receipt of the ${noticeDates[0]} notice plus the ${cureDuration} cure period before the ${actionDates[0]} action.`);
     }
     if (servicePeriods.length && hasTag(activeIssueTags, "SLA")) {
@@ -993,6 +1279,7 @@
     const invoiceLabel = invoiceDates.length ? `${formatList(invoiceDates)} invoices` : "identified invoices";
     const deliveryTimeline = extractDeliveryTimeline(data);
     const fmTimeline = extractForceMajeureTimeline(data);
+    const refundTimeline = extractRefundTerminationTimeline(data);
     const ldTerms = extractLiquidatedDamagesTerms(data);
     const noticeDates = extractNoticeDates(data);
     const noticeDate = deliveryTimeline.noticeDate || noticeDates[0] || "the notice";
@@ -1006,6 +1293,58 @@
     const capPeriod = extractLiabilityCapPeriod(data.contractText);
     const provider = partyName(data, "provider", "claimant");
     const customer = partyName(data, "customer", "respondent");
+    const refundAcceptanceIssue =
+      hasTag(activeIssueTags, "refund") ||
+      hasTag(activeIssueTags, "prepaid fees") ||
+      hasTag(activeIssueTags, "acceptance / rejection");
+
+    if (refundAcceptanceIssue) {
+      if (refundTimeline.dataImportMilestoneDate || refundTimeline.trainingMilestoneDate) {
+        const dataImport = refundTimeline.dataImportMilestoneDate || "the data import milestone date";
+        const training = refundTimeline.trainingMilestoneDate || "the administrator training milestone date";
+        addUnique(issues, `Whether the ${dataImport} data import milestone and ${training} administrator training milestone were missed.`);
+      }
+      if (refundTimeline.partialDeliveryDate) {
+        addUnique(issues, `Whether the ${refundTimeline.partialDeliveryDate} partial data import substantially completed the onboarding services.`);
+      }
+      if (refundTimeline.breachNoticeDate) {
+        addUnique(issues, `Whether the customer's ${refundTimeline.breachNoticeDate} breach notice was sent to the contractual notice contacts.`);
+      }
+      if (refundTimeline.curePeriod && refundTimeline.terminationDate) {
+        addUnique(issues, `Whether the ${refundTimeline.curePeriod} cure period expired before the ${refundTimeline.terminationDate} termination.`);
+      }
+      if (refundTimeline.partialDeliveryDate && hasSignal(clauseSignals, "acceptance")) {
+        addUnique(issues, `Whether the ${refundTimeline.partialDeliveryDate} delivery package requested formal milestone acceptance.`);
+      }
+      if (refundTimeline.partialDeliveryDate && hasSignal(clauseSignals, "rejection")) {
+        const rejectionPeriod = refundTimeline.rejectionPeriod ? `the ${refundTimeline.rejectionPeriod} rejection period` : "the contractual rejection period";
+        addUnique(issues, `Whether the customer rejected the ${refundTimeline.partialDeliveryDate} delivery within ${rejectionPeriod}.`);
+      }
+      if (hasSignal(clauseSignals, "specificity")) {
+        addUnique(issues, "Whether any rejection identified material defects with reasonable specificity.");
+      }
+      if (refundTimeline.prepaidAmount || hasSignal(clauseSignals, "non-refundable") || hasSignal(clauseSignals, "pro-rata refund")) {
+        const amount = refundTimeline.prepaidAmount ? `${refundTimeline.prepaidAmount} implementation fee` : "implementation fee";
+        addUnique(issues, `Whether the prepaid ${amount} is non-refundable or refundable pro rata after uncured breach.`);
+      }
+      if (refundTimeline.refundAmount || triggers.refund) {
+        const amount = refundTimeline.refundAmount || "requested";
+        addUnique(issues, `Whether the ${amount} refund calculation is supported by performed vs unperformed service records.`);
+      }
+      if (hasAny(allText(data), ["lost productivity", "internal delay"]) || hasSignal(clauseSignals, "consequential damages") || hasSignal(clauseSignals, "lost-profit")) {
+        addUnique(issues, "Whether lost productivity or internal delay costs are barred by consequential damages or lost-profit exclusions.");
+      }
+      if (hasTag(activeIssueTags, "liability limitation")) {
+        if (capPeriod) {
+          addUnique(issues, `Whether the ${durationAdjective(capPeriod)} fee liability cap limits recovery.`);
+        } else {
+          addUnique(issues, "Whether the contractual liability cap limits recovery.");
+        }
+      }
+      if (issues.length) {
+        return issues;
+      }
+    }
 
     if (hasTag(activeIssueTags, "payment")) {
       const timing = paymentDeadline ? ` and overdue under the ${paymentDeadline} payment timing` : " and overdue";
@@ -1029,11 +1368,11 @@
       if (hasTag(activeIssueTags, "force majeure")) {
         // Force majeure notice timing is not a cure-period issue.
       } else if (hasTag(activeIssueTags, "delivery") && (deliveryTimeline.revisedPackageDate || deliveryTimeline.rejectionDate || deliveryTimeline.hasApiMappingDefects)) {
-        const revised = deliveryTimeline.revisedPackageDate || "revised package";
+        const revised = deliveryTimeline.revisedPackageDate ? `${deliveryTimeline.revisedPackageDate} revised package` : "the revised package";
         const rejected = deliveryTimeline.rejectionDate || "the rejection";
         const review = deliveryTimeline.reviewPeriod ? ` and within the ${deliveryTimeline.reviewPeriod} review period` : "";
         const defects = deliveryTimeline.hasApiMappingDefects ? "API mapping defects" : "reported delivery defects";
-        addUnique(issues, `Whether the ${revised} revised package cured the ${defects} before the ${rejected} rejection${review}.`);
+        addUnique(issues, `Whether ${revised} cured the ${defects} before the ${rejected} rejection${review}.`);
       } else {
         const deemed = hasSignal(clauseSignals, "deemed receipt") ? " after next-business-day deemed receipt" : " after receipt";
         const cure = cureDuration || "contractual";
@@ -1137,7 +1476,12 @@
     const steps = [];
     const tags = diagnosis.activeIssueTags || diagnosis.issueTags || [];
     const fmTimeline = extractForceMajeureTimeline(data);
+    const refundTimeline = extractRefundTerminationTimeline(data);
     const ldTerms = extractLiquidatedDamagesTerms(data);
+    const refundAcceptanceIssue =
+      hasTag(tags, "refund") ||
+      hasTag(tags, "prepaid fees") ||
+      hasTag(tags, "acceptance / rejection");
 
     if (hasTag(tags, "force majeure") && hasTag(tags, "delivery")) {
       const datedTimeline = [
@@ -1162,6 +1506,33 @@
       );
       addUnique(steps, "Analyze lost revenue under the lost-profit/consequential damages exclusion.");
       addUnique(steps, "Apply the six-month fee liability cap.");
+      if (data.desiredOutcome) {
+        addUnique(steps, `Frame the next report around the desired outcome: ${data.desiredOutcome}`);
+      }
+      return data.diagnosisDepth === "Quick" ? steps.slice(0, 6) : steps;
+    }
+
+    if (refundAcceptanceIssue) {
+      const datedTimeline = [
+        refundTimeline.prepaidPaymentDate,
+        refundTimeline.dataImportMilestoneDate,
+        refundTimeline.trainingMilestoneDate,
+        refundTimeline.partialDeliveryDate,
+        refundTimeline.breachNoticeDate,
+        refundTimeline.providerResponseDate,
+        refundTimeline.terminationDate
+      ].filter(Boolean).join(" / ");
+      addUnique(steps, datedTimeline ? `Build a ${datedTimeline} timeline.` : "Build a prepaid fee, milestone, breach notice, cure, termination, and acceptance timeline.");
+      addUnique(steps, "Verify SOW notice contacts.");
+      addUnique(steps, refundTimeline.breachNoticeDate ? `Verify proof of ${refundTimeline.breachNoticeDate} breach notice delivery.` : "Verify proof of breach notice delivery.");
+      addUnique(steps, `Calculate deemed receipt and ${refundTimeline.curePeriod || "contractual"} cure deadline.`);
+      addUnique(steps, `Determine whether the ${refundTimeline.partialDeliveryDate || "delivery"} delivery requested formal acceptance.`);
+      addUnique(steps, `Determine whether the customer rejected within ${durationSentence(refundTimeline.rejectionPeriod) || "the contractual rejection period"}.`);
+      addUnique(steps, "Review whether rejection identified material defects with reasonable specificity.");
+      addUnique(steps, "Compare performed vs unperformed service records.");
+      addUnique(steps, refundTimeline.refundAmount ? `Validate the ${refundTimeline.refundAmount} pro-rata refund calculation.` : "Validate the pro-rata refund calculation.");
+      addUnique(steps, `Review consequential damages, lost-profit exclusion, and ${durationAdjective(extractLiabilityCapPeriod(data.contractText)) || "contractual"} fee liability cap.`);
+      addUnique(steps, "Verify evidence supporting lost productivity damages.");
       if (data.desiredOutcome) {
         addUnique(steps, `Frame the next report around the desired outcome: ${data.desiredOutcome}`);
       }
@@ -1214,6 +1585,12 @@
       text.includes("timestamped sla") ||
       text.includes("damages calculation") ||
       text.includes("lost revenue calculation") ||
+      text.includes("lost productivity") ||
+      text.includes("refund calculation") ||
+      text.includes("work-completion") ||
+      text.includes("performed vs unperformed") ||
+      text.includes("formal milestone acceptance") ||
+      text.includes("rejected within") ||
       text.includes("disputed amounts")
     );
   }
@@ -1256,7 +1633,11 @@
       rationale.push("Party positions dispute core facts or causation.");
     }
     if (hasTag(activeIssueTags, "liability limitation")) {
-      rationale.push("Requested remedies may exceed service-credit, damages-exclusion, or liability-cap limits.");
+      if (hasTag(activeIssueTags, "service credit")) {
+        rationale.push("Requested remedies may exceed service-credit, damages-exclusion, or liability-cap limits.");
+      } else {
+        rationale.push("Requested remedies may exceed damages-exclusion or liability-cap limits.");
+      }
     }
 
     if (combined.trim().length < 140) {
@@ -1294,8 +1675,12 @@
     if (respondent.includes("downtime") || claimant.includes("downtime") || respondent.includes("sla") || claimant.includes("sla")) {
       facts.push("Whether service downtime was provider-side, customer-side, or otherwise excluded");
     }
-    if (respondent.includes("lost revenue") || claimant.includes("lost revenue") || respondent.includes("damages") || claimant.includes("damages")) {
-      facts.push("Whether claimed damages are recoverable after service-credit, damages-exclusion, and liability-cap terms");
+    if (respondent.includes("lost revenue") || claimant.includes("lost revenue") || respondent.includes("lost productivity") || claimant.includes("lost productivity") || respondent.includes("damages") || claimant.includes("damages")) {
+      if (respondent.includes("service credit") || claimant.includes("service credit")) {
+        facts.push("Whether claimed damages are recoverable after service-credit, damages-exclusion, and liability-cap terms");
+      } else {
+        facts.push("Whether claimed damages are recoverable after damages-exclusion and liability-cap terms");
+      }
     }
     if (respondent.includes("accepted") || claimant.includes("accepted")) {
       facts.push("Whether work or goods were accepted before the dispute escalated");
@@ -1394,10 +1779,12 @@
     if (triggers.termination || hasTag(activeIssueTags, "termination")) {
       addUnique(types, "Termination");
     }
-    if ((triggers.delivery || hasTag(activeIssueTags, "delivery")) && hasAny(allText(data), ["acceptance criteria", "accepted delivery", "acceptance test", "acceptance testing"])) {
+    if (hasTag(activeIssueTags, "acceptance / rejection")) {
+      addUnique(types, "Acceptance/Rejection");
+    } else if ((triggers.delivery || hasTag(activeIssueTags, "delivery")) && hasAny(allText(data), ["acceptance criteria", "accepted delivery", "acceptance test", "acceptance testing"])) {
       addUnique(types, "Delivery/Acceptance");
     }
-    if (triggers.refund) {
+    if (triggers.refund || hasTag(activeIssueTags, "refund")) {
       addUnique(types, "Refund");
     }
     return types.length ? types : ["Other"];
