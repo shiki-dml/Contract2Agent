@@ -1,5 +1,44 @@
 # Contract2Agent Bug Audit
 
+## 2026-05-05 Force Majeure Blocker Follow-Up
+
+### Symptom
+
+The Sales Contract clause-only fixture could still surface force majeure outside `clause_signals` when the desired outcome mentioned force majeure notice or mitigation, even though the factual fields denied force majeure notice, government order, natural disaster, port closure, strike, war, emergency closure, extraordinary external event, and identified ordinary staffing/vendor backlog facts.
+
+### Root cause
+
+The exact active path was `deriveActiveIssueTags` -> `shouldActivateIssueFamily` -> `familyBlocked(data, family, activeTrigger)`. `familyBlocked` intentionally returned `false` whenever `activeTrigger` was truthy, so force majeure blockers were skipped after a phrase such as `force majeure notice` made `triggers.forceMajeure` true. A second visible leak came from `buildNextSteps`, which echoed `desiredOutcome` verbatim even when force majeure had been blocked from active tags.
+
+### Files changed
+
+- `docs/assets/app.js`
+- `tests/test_docs_site.py`
+- `bug_audit.md`
+
+### Fix summary
+
+- Added `hasFamilyBlocker(data, family)` and made `shouldActivateIssueFamily` always enforce it for `force_majeure`.
+- Added `addDesiredOutcomeStep` so a blocked, inactive force majeure phrase in `desiredOutcome` is not reintroduced into suggested next steps.
+- Kept force majeure clause detection intact; force majeure can still appear in `clause_signals`.
+
+### Regression test
+
+- Updated `test_playground_force_majeure_clause_only_stays_clause_signal` so the Sales fixture includes a desired-outcome force majeure phrase plus explicit negative facts.
+- The test asserts force majeure remains clause-signal-only and is absent from `active_issue_tags`, `dispute_type`, risk rationale, suggested next steps, Evaluation Lab `case_name`, and Evaluation Lab `must_include_issues`.
+
+### Commands run
+
+| Command | Result | Summary |
+| --- | --- | --- |
+| `python -m pytest tests\test_docs_site.py::test_playground_force_majeure_clause_only_stays_clause_signal` | Passed | 1 passed after the targeted fix. |
+| `python -m pytest` | Passed | 260 passed in 20.94s on the final run. |
+| `node --check docs\assets\app.js` | Passed | Static playground JavaScript parses successfully. |
+
+### Remaining follow-ups
+
+This was intentionally narrow. Other issue-family blockers still use the existing `familyBlocked(data, family, positiveTrigger)` behavior unless a concrete regression shows the same blocker-after-positive-trigger failure.
+
 ## 2026-05-05 Clause Signal vs Active Issue Separation
 
 ### Symptom

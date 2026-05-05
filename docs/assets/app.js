@@ -652,11 +652,18 @@
     if (positiveTrigger) {
       return false;
     }
+    return hasFamilyBlocker(data, family);
+  }
+
+  function hasFamilyBlocker(data, family) {
     return splitSegments(activeTriggerText(data)).some((segment) => segmentBlocksFamily(segment, family));
   }
 
   function shouldActivateIssueFamily(data, family, clauseSignals, activeTrigger, clausePhrases, options) {
     const config = options || {};
+    if (family === "force_majeure" && hasFamilyBlocker(data, family)) {
+      return false;
+    }
     if (!activeTrigger || familyBlocked(data, family, activeTrigger)) {
       return false;
     }
@@ -2583,9 +2590,7 @@
       if (hasTag(tags, "damages") || hasTag(tags, "liability limitation")) {
         addUnique(steps, "Review damages exclusions and recoverability of business-impact damages.");
       }
-      if (data.desiredOutcome) {
-        addUnique(steps, `Frame the next report around the desired outcome: ${data.desiredOutcome}`);
-      }
+      addDesiredOutcomeStep(steps, data, tags);
       return limitStepsForDepth(data, steps);
     }
 
@@ -2612,9 +2617,7 @@
       );
       addUnique(steps, "Analyze lost revenue under the lost-profit/consequential damages exclusion.");
       addUnique(steps, "Apply the six-month fee liability cap.");
-      if (data.desiredOutcome) {
-        addUnique(steps, `Frame the next report around the desired outcome: ${data.desiredOutcome}`);
-      }
+      addDesiredOutcomeStep(steps, data, tags);
       return limitStepsForDepth(data, steps);
     }
 
@@ -2639,9 +2642,7 @@
       addUnique(steps, refundTimeline.refundAmount ? `Validate the ${refundTimeline.refundAmount} pro-rata refund calculation.` : "Validate the pro-rata refund calculation.");
       addUnique(steps, `Review consequential damages, lost-profit exclusion, and ${durationAdjective(extractLiabilityCapPeriod(data.contractText)) || "contractual"} fee liability cap.`);
       addUnique(steps, "Verify evidence supporting lost productivity damages.");
-      if (data.desiredOutcome) {
-        addUnique(steps, `Frame the next report around the desired outcome: ${data.desiredOutcome}`);
-      }
+      addDesiredOutcomeStep(steps, data, tags);
       return limitStepsForDepth(data, steps);
     }
 
@@ -2669,11 +2670,23 @@
     if (!steps.length) {
       addUnique(steps, "Build a dated timeline and attach source evidence to each issue before relying on the diagnosis.");
     }
-    if (data.desiredOutcome) {
-      addUnique(steps, `Frame the next report around the desired outcome: ${data.desiredOutcome}`);
-    }
+    addDesiredOutcomeStep(steps, data, tags);
 
     return limitStepsForDepth(data, steps);
+  }
+
+  function addDesiredOutcomeStep(steps, data, activeIssueTags) {
+    if (!data.desiredOutcome) {
+      return;
+    }
+    if (
+      !hasTag(activeIssueTags, "force majeure") &&
+      hasFamilyBlocker(data, "force_majeure") &&
+      hasAny(data.desiredOutcome, ["force majeure"])
+    ) {
+      return;
+    }
+    addUnique(steps, `Frame the next report around the desired outcome: ${data.desiredOutcome}`);
   }
 
   function isCriticalEvidenceGap(gap) {

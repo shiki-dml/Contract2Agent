@@ -205,7 +205,10 @@ SALES_FORCE_MAJEURE_CLAUSE_ONLY_FIXTURE = {
     "outputFormat": "Detailed",
     "diagnosisDepth": "Detailed",
     "riskMode": "Evidence-first",
-    "desiredOutcome": "Assess late shipment remedies and confirm ordinary supply-delay defenses.",
+    "desiredOutcome": (
+        "Confirm Seller cannot rely on force majeure notice, mitigation, internal "
+        "staffing shortages, or ordinary vendor backlog to excuse late shipment."
+    ),
     "contractText": (
         "Seller must deliver conforming equipment by May 15. The agreement includes a "
         "force majeure clause covering natural disasters, government orders, port "
@@ -215,7 +218,8 @@ SALES_FORCE_MAJEURE_CLAUSE_ONLY_FIXTURE = {
         "Payment is due net 30 after accepted delivery."
     ),
     "disputeDescription": (
-        "Seller shipped the equipment on May 25 after an ordinary component backlog. "
+        "Seller shipped the equipment on May 25 after internal staffing shortages and "
+        "an ordinary component backlog. "
         "Buyer says the shipment was late and asks whether it may reject or recover "
         "ordinary delay damages. No party claims force majeure. No force majeure notice "
         "was sent. There was no government order, no natural disaster, no port closure, "
@@ -1033,6 +1037,9 @@ def test_playground_force_majeure_clause_only_stays_clause_signal() -> None:
     assert exported["issue_tags"] == diagnosis["active_issue_tags"]
     assert "force majeure" not in _markdown_list_items(markdown, "Active Issue Tags")
     assert "force majeure" not in test_case["expected_outputs"]["must_include_issues"]
+    assert "force_majeure" not in test_case["case_name"]
+    assert "force majeure" not in "\n".join(diagnosis["risk"]["rationale"]).lower()
+    assert "force majeure" not in "\n".join(diagnosis["suggested_next_steps"]).lower()
 
     clause_only_text = "\n".join(
         diagnosis["key_issues"] +
