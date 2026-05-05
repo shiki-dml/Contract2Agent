@@ -120,9 +120,17 @@
     "force majeure notice",
     "invokes force majeure",
     "invoked force majeure",
+    "claims force majeure",
+    "claimed force majeure",
+    "force majeure event",
+    "force majeure prevented",
+    "excused by force majeure",
     "government order",
     "government action",
     "natural disaster",
+    "port closure",
+    "emergency closure",
+    "extraordinary external event",
     "pandemic",
     "war",
     "strike",
@@ -175,15 +183,19 @@
         "invoice was disputed",
         "invoices were disputed",
         "charge dispute",
-        "invoice number",
-        "invoice date"
+        "billing dispute",
+        "payment demand",
+        "failure to pay invoice",
+        "invoice rejection"
       ],
       clause_triggers: ["disputes an invoice", "disputed amount", "basis for dispute"],
       negative_triggers: [
         "no invoice dispute",
         "not an invoice dispute",
         "no disputed invoice",
-        "no disputed invoices"
+        "no disputed invoices",
+        "no unpaid invoice",
+        "no billing dispute"
       ],
       blocker_terms: ["invoice dispute", "disputed invoice", "disputed invoices", "charge dispute", "invoice", "invoices"]
     },
@@ -312,20 +324,33 @@
     },
     force_majeure: {
       active_triggers: forceMajeureFactTriggers,
-      clause_triggers: ["force majeure", "government order", "natural disaster", "strike", "war"],
+      clause_triggers: ["force majeure", "government order", "natural disaster", "port closure", "strike", "war", "emergency closure", "extraordinary external event", "external uncontrollable event"],
       negative_triggers: [
         "no force majeure",
+        "no force majeure notice",
+        "no government order",
+        "no natural disaster",
+        "no port closure",
+        "no strike",
+        "no war",
+        "no emergency closure",
+        "no extraordinary external event",
+        "no external uncontrollable event",
+        "no external event",
         "no party invokes force majeure",
         "no party claims force majeure",
         "no party claims government order",
         "no party claims natural disaster",
-        "force majeure appears only"
+        "force majeure appears only",
+        "internal staffing shortage only",
+        "ordinary vendor backlog only",
+        "ordinary raw-material backlog only",
+        "ordinary raw material backlog only"
       ],
-      blocker_terms: ["force majeure", "government order", "natural disaster", "strike", "war", "external uncontrollable event", "external event"]
+      blocker_terms: ["force majeure", "government order", "natural disaster", "port closure", "strike", "war", "emergency closure", "extraordinary external event", "external uncontrollable event", "external event"]
     },
     confidentiality: {
       active_triggers: [
-        "confidential information",
         "confidentiality breach",
         "breach of confidentiality",
         "unauthorized disclosure",
@@ -351,6 +376,9 @@
         "no confidentiality dispute",
         "no confidentiality breach",
         "no confidential information",
+        "no confidential information disclosure",
+        "no unauthorized disclosure",
+        "no public disclosure",
         "not a confidentiality dispute"
       ],
       blocker_terms: ["confidentiality", "confidential information", "disclosure", "public link", "workspace exposure", "nda"]
@@ -375,9 +403,6 @@
         "copyright demand",
         "patent claim",
         "trademark claim",
-        "provider-owned materials",
-        "provider-owned tools",
-        "customer-provided materials",
         "claim tender"
       ],
       clause_triggers: ["indemnity", "indemnify", "defend", "hold harmless"],
@@ -387,6 +412,10 @@
         "no indemnification",
         "no third-party",
         "no third party",
+        "no third-party claim",
+        "no third party claim",
+        "no defense tender",
+        "no indemnity tender",
         "no ip",
         "no intellectual property",
         "no infringement",
@@ -467,10 +496,29 @@
       blocker_terms: ["suspension", "suspended", "suspend", "access disabled", "service access blocked"]
     },
     liquidated_damages: {
-      active_triggers: ["liquidated damages", "penalty", "per-week damages", "per week", "ld cap", "unexcused delay damages"],
+      active_triggers: ["seeks liquidated damages", "seek liquidated damages", "liquidated damages claim", "liquidated damages calculation", "disputes liquidated damages", "dispute liquidated damages", "liquidated damages cap", "penalty", "per-week damages", "per week", "ld cap", "unexcused delay damages"],
       clause_triggers: ["liquidated damages", "penalty"],
       negative_triggers: ["no liquidated damages", "no penalties", "no party claims liquidated damages"],
       blocker_terms: ["liquidated damages", "penalty", "penalties", "ld cap"]
+    },
+    liability_limitation: {
+      active_triggers: [
+        "liability cap",
+        "limitation of liability",
+        "damages exclusion",
+        "consequential damages",
+        "lost revenue exclusion",
+        "lost profit exclusion",
+        "lost-profit exclusion",
+        "requested damages may exceed cap",
+        "argues cap applies",
+        "cap limits recovery",
+        "disputed recovery",
+        "carve-out dispute"
+      ],
+      clause_triggers: ["liability cap", "limitation of liability", "damages exclusion", "consequential damages", "lost-profit"],
+      negative_triggers: ["no liability cap dispute", "no limitation of liability dispute", "no damages cap dispute"],
+      blocker_terms: ["liability cap", "limitation of liability", "damages cap", "damages exclusion", "cap limits recovery"]
     },
     cover_costs: {
       active_triggers: ["substitute goods", "temporary consultant", "alternate provider", "cover purchase", "replacement supplier", "documented cover costs", "cover cost", "cover costs"],
@@ -592,7 +640,7 @@
 
   function hasIssueFactTrigger(data, family, extraTriggers) {
     const triggers = (extraTriggers || []).concat(registryEntry(family).active_triggers || []);
-    return splitSegments(factText(data)).some((segment) => {
+    return splitSegments(activeTriggerText(data)).some((segment) => {
       if (segmentBlocksFamily(segment, family)) {
         return false;
       }
@@ -604,7 +652,19 @@
     if (positiveTrigger) {
       return false;
     }
-    return splitSegments(factText(data)).some((segment) => segmentBlocksFamily(segment, family));
+    return splitSegments(activeTriggerText(data)).some((segment) => segmentBlocksFamily(segment, family));
+  }
+
+  function shouldActivateIssueFamily(data, family, clauseSignals, activeTrigger, clausePhrases, options) {
+    const config = options || {};
+    if (!activeTrigger || familyBlocked(data, family, activeTrigger)) {
+      return false;
+    }
+    if (config.requireClause === false) {
+      return true;
+    }
+    const requiredSignals = clausePhrases || registryEntry(family).clause_triggers || [];
+    return requiredSignals.some((signal) => hasSignal(clauseSignals, signal));
   }
 
   function countGroup(text, group) {
@@ -612,21 +672,6 @@
       (count, word) => count + (normalize(text).includes(word) ? 1 : 0),
       0
     );
-  }
-
-  function detectGroups(data) {
-    const combined = [
-      data.contractType,
-      data.disputeType,
-      data.contractText,
-      data.disputeDescription,
-      data.claimantPosition,
-      data.respondentPosition,
-      data.evidence,
-      data.metadata
-    ].join(" ");
-
-    return Object.keys(keywordGroups).filter((group) => countGroup(combined, group) > 0);
   }
 
   function hasDateSignal(text) {
@@ -665,6 +710,17 @@
   function factText(data) {
     return collectCaseText(data, [
       "disputeType",
+      "desiredOutcome",
+      "disputeDescription",
+      "claimantPosition",
+      "respondentPosition",
+      "evidence",
+      "metadata"
+    ]);
+  }
+
+  function activeTriggerText(data) {
+    return collectCaseText(data, [
       "desiredOutcome",
       "disputeDescription",
       "claimantPosition",
@@ -1128,17 +1184,11 @@
   }
 
   function hasForceMajeureFactTrigger(data) {
-    const facts = factText(data);
-    if (hasExternalEventDenial(facts)) {
-      return false;
-    }
+    const facts = activeTriggerText(data);
     const longTriggers = forceMajeureFactTriggers
       .filter((trigger) => !["war", "strike"].includes(trigger))
       .concat([
-        "force majeure",
         "external uncontrollable event",
-        "external event",
-        "emergency closure",
         "export restriction",
         "port closure"
       ]);
@@ -1293,39 +1343,8 @@
     );
   }
 
-  function hasExternalEventDenial(text) {
-    return splitSegments(text).some((segment) => {
-      const lower = normalize(segment);
-      const deniesInvocation = hasAny(lower, [
-        "no force majeure",
-        "not force majeure",
-        "does not invoke force majeure",
-        "does not invoke an external event",
-        "no party invokes force majeure",
-        "no party claims force majeure",
-        "no party claims that",
-        "no party claims an",
-        "no party claims a",
-        "neither party claims",
-        "neither party invokes",
-        "not invoked force majeure",
-        "force majeure appears only",
-        "no evidence of force majeure"
-      ]);
-      const externalEvent = hasAny(lower, forceMajeureFactTriggers.concat([
-        "external uncontrollable event",
-        "external event",
-        "outside its control",
-        "natural disaster",
-        "government order",
-        "other external"
-      ]));
-      return deniesInvocation && externalEvent;
-    });
-  }
-
   function extractFactualTriggers(data) {
-    const facts = factText(data);
+    const facts = activeTriggerText(data);
     const lowerFacts = normalize(facts);
     const dispute = normalize(data.disputeType);
     const contract = normalize(data.contractType);
@@ -1348,6 +1367,7 @@
     const propertyDamageCausationFact = hasPropertyDamageCausationFactTrigger(data);
     const liquidatedDamagesFact = hasIssueFactTrigger(data, "liquidated_damages");
     const coverCostsFact = hasIssueFactTrigger(data, "cover_costs");
+    const liabilityLimitationActiveFact = hasIssueFactTrigger(data, "liability_limitation");
     const nonDesiredFacts = collectCaseText(data, [
       "disputeDescription",
       "claimantPosition",
@@ -1385,24 +1405,16 @@
         "repair deductions"
       ]);
     });
-    const liabilityLimitationFact = hasAny(facts, [
-      "liability cap",
-      "limitation of liability",
-      "twelve-month fee cap",
-      "six-month fee cap",
-      "three-month fee cap",
-      "fee cap",
-      "damages exclusion",
-      "consequential damages",
-      "lost revenue exclusion",
-      "lost productivity",
-      "internal delay costs",
-      "lost-profit",
-      "lost profit",
-      "damages beyond",
-      "fees paid",
-      "cap"
-    ]);
+    const liabilityLimitationFact =
+      liabilityLimitationActiveFact ||
+      hasAny(facts, [
+        "twelve-month fee cap",
+        "six-month fee cap",
+        "three-month fee cap",
+        "fee cap",
+        "damages beyond",
+        "fees paid"
+      ]);
 
     return {
       payment:
@@ -1439,7 +1451,9 @@
         forceMajeureFact && hasAny(facts, ["mitigation", "mitigate", "commercially reasonable mitigation", "remote migration", "remote tools", "alternate staffing", "alternate site access"]),
       coverCosts: coverCostsFact,
       damages: damagesFact || liquidatedDamagesFact,
-      liabilityLimitation: liabilityLimitationFact || (damagesFact && hasAny(data.contractText, ["liability cap", "total liability", "capped at", "damages exclusion", "consequential", "lost-profit", "lost profit"])),
+      liabilityLimitation:
+        liabilityLimitationFact ||
+        (damagesFact && hasAny(data.contractText, ["liability cap", "total liability", "capped at", "damages exclusion", "consequential", "lost-profit", "lost profit"])),
       indemnity: indemnityFact,
       thirdPartyIp: thirdPartyIpFact,
       confidentiality: confidentialityFact,
@@ -1457,8 +1471,7 @@
       securityDeposit: securityDepositFact,
       tenantCausedDamage: tenantDamageFact,
       propertyDamageCausation: propertyDamageCausationFact,
-      penalty:
-        liquidatedDamagesFact || (hasAny(data.contractText, ["liquidated damages", "penalty"]) && (deliveryFact || forceMajeureFact || damagesFact)),
+      penalty: liquidatedDamagesFact,
       forceMajeure: forceMajeureFact,
       contested:
         hasAny(lowerFacts, ["argues", "claims", "says", "disputed", "never", "caused by", "premature", "too aggressively"]) &&
@@ -1692,100 +1705,101 @@
   }
 
   function deriveActiveIssueTags(data, clauseSignals, triggers) {
-    const groups = detectGroups(data);
     const tags = [];
+    const activate = (family, activeTrigger, clausePhrases, options) =>
+      shouldActivateIssueFamily(data, family, clauseSignals, activeTrigger, clausePhrases, options);
 
-    if (!familyBlocked(data, "payment", triggers.payment) && triggers.payment && (hasSignal(clauseSignals, "payment") || groups.includes("payment"))) {
+    if (activate("payment", triggers.payment, ["payment", "invoice"])) {
       addUnique(tags, "payment");
     }
-    if (!familyBlocked(data, "invoice_dispute", triggers.invoiceDispute) && triggers.invoiceDispute && (hasSignal(clauseSignals, "disputed invoice") || hasSignal(clauseSignals, "payment") || groups.includes("payment"))) {
+    if (activate("invoice_dispute", triggers.invoiceDispute, ["disputed invoice", "payment", "invoice"])) {
       addUnique(tags, "invoice dispute");
     }
-    if (!familyBlocked(data, "refund", triggers.refund) && triggers.refund && (hasSignal(clauseSignals, "refund") || hasSignal(clauseSignals, "prepaid") || groups.includes("payment"))) {
+    if (activate("refund", triggers.refund, ["refund", "prepaid", "non-refundable"])) {
       addUnique(tags, "refund");
     }
-    if (triggers.prepaidFees && (hasSignal(clauseSignals, "prepaid") || hasSignal(clauseSignals, "non-refundable") || hasSignal(clauseSignals, "refund"))) {
+    if (activate("refund", triggers.prepaidFees, ["prepaid", "non-refundable", "refund"])) {
       addUnique(tags, "prepaid fees");
     }
-    if ((triggers.notice || triggers.suspension || triggers.termination) && (hasSignal(clauseSignals, "notice") || hasSignal(clauseSignals, "deemed receipt") || groups.includes("notice"))) {
+    if (activate("notice", triggers.notice || triggers.suspension || triggers.termination, ["notice", "deemed receipt"], { requireClause: false })) {
       addUnique(tags, "notice");
     }
-    if ((triggers.cure || triggers.suspension || triggers.termination || (triggers.delivery && triggers.notice)) && hasSignal(clauseSignals, "cure")) {
+    if (activate("cure", triggers.cure || triggers.suspension || triggers.termination || (triggers.delivery && triggers.notice), ["cure"])) {
       addUnique(tags, "cure period");
     }
-    if (triggers.leaseMaintenance && hasSignal(clauseSignals, "landlord maintenance")) {
+    if (activate("lease_maintenance", triggers.leaseMaintenance, ["landlord maintenance"])) {
       addUnique(tags, "lease maintenance");
     }
-    if (triggers.repairObligation && (hasSignal(clauseSignals, "commercially reasonable repairs") || hasSignal(clauseSignals, "repair cure period"))) {
+    if (activate("lease_maintenance", triggers.repairObligation, ["commercially reasonable repairs", "repair cure period"])) {
       addUnique(tags, "repair obligation");
     }
-    if (triggers.rentAbatement && hasSignal(clauseSignals, "rent abatement")) {
+    if (activate("rent_abatement", triggers.rentAbatement, ["rent abatement"])) {
       addUnique(tags, "rent abatement");
     }
-    if (triggers.rentWithholding && hasSignal(clauseSignals, "rent withholding")) {
+    if (activate("rent_withholding", triggers.rentWithholding, ["rent withholding"])) {
       addUnique(tags, "rent withholding");
     }
-    if (triggers.paymentDefault && hasSignal(clauseSignals, "payment default")) {
+    if (activate("rent_withholding", triggers.paymentDefault, ["payment default"])) {
       addUnique(tags, "payment default");
     }
-    if (triggers.securityDeposit && hasSignal(clauseSignals, "security deposit")) {
+    if (activate("security_deposit", triggers.securityDeposit, ["security deposit"])) {
       addUnique(tags, "security deposit");
     }
-    if (triggers.tenantCausedDamage && hasSignal(clauseSignals, "tenant-caused damage")) {
+    if (activate("tenant_damage", triggers.tenantCausedDamage, ["tenant-caused damage"])) {
       addUnique(tags, "tenant-caused damage");
     }
-    if (triggers.propertyDamageCausation && (hasSignal(clauseSignals, "tenant-caused damage") || hasSignal(clauseSignals, "ordinary wear"))) {
+    if (activate("tenant_damage", triggers.propertyDamageCausation, ["tenant-caused damage", "ordinary wear"])) {
       addUnique(tags, "property damage causation");
     }
-    if (!familyBlocked(data, "suspension", triggers.suspension) && triggers.suspension && hasSignal(clauseSignals, "suspension")) {
+    if (activate("suspension", triggers.suspension, ["suspension"])) {
       addUnique(tags, "suspension");
     }
-    if (triggers.termination && (hasSignal(clauseSignals, "termination") || groups.includes("termination"))) {
+    if (activate("termination", triggers.termination, ["termination"], { requireClause: false })) {
       addUnique(tags, "termination");
     }
-    if (!familyBlocked(data, "delivery", triggers.delivery) && triggers.delivery && (hasSignal(clauseSignals, "delivery") || groups.includes("delivery"))) {
+    if (activate("delivery", triggers.delivery, ["delivery", "milestone", "acceptance"], { requireClause: false })) {
       addUnique(tags, "delivery");
     }
-    if (triggers.acceptanceRejection && (hasSignal(clauseSignals, "acceptance") || hasSignal(clauseSignals, "rejection") || hasSignal(clauseSignals, "specificity"))) {
+    if (activate("delivery", triggers.acceptanceRejection, ["acceptance", "rejection", "specificity"])) {
       addUnique(tags, "acceptance / rejection");
     }
-    if (!familyBlocked(data, "sla", triggers.sla) && triggers.sla && (hasSignal(clauseSignals, "SLA") || hasSignal(clauseSignals, "uptime"))) {
+    if (activate("sla", triggers.sla, ["SLA", "uptime"])) {
       addUnique(tags, "SLA");
     }
-    if (!familyBlocked(data, "sla", triggers.serviceCredit) && triggers.serviceCredit && hasSignal(clauseSignals, "service credit")) {
+    if (activate("sla", triggers.serviceCredit, ["service credit"])) {
       addUnique(tags, "service credit");
     }
-    if (triggers.mitigation && hasSignal(clauseSignals, "mitigation")) {
+    if (activate("force_majeure", triggers.mitigation, ["mitigation"])) {
       addUnique(tags, "mitigation");
     }
-    if (!familyBlocked(data, "cover_costs", triggers.coverCosts) && triggers.coverCosts && hasSignal(clauseSignals, "cover costs")) {
+    if (activate("cover_costs", triggers.coverCosts, ["cover costs"])) {
       addUnique(tags, "cover costs");
     }
-    if (triggers.damages || triggers.refund || triggers.penalty) {
+    if (activate("damages", triggers.damages || triggers.refund || triggers.penalty, [], { requireClause: false })) {
       addUnique(tags, "damages");
     }
-    if ((triggers.damages || triggers.liabilityLimitation) && (hasSignal(clauseSignals, "liability cap") || hasSignal(clauseSignals, "damages exclusion"))) {
+    if (activate("liability_limitation", triggers.damages || triggers.liabilityLimitation, ["liability cap", "damages exclusion", "lost-profit", "consequential"])) {
       addUnique(tags, "liability limitation");
     }
-    if (!familyBlocked(data, "indemnity", triggers.indemnity) && triggers.indemnity && hasSignal(clauseSignals, "indemnity")) {
+    if (activate("indemnity", triggers.indemnity, ["indemnity"])) {
       addUnique(tags, "indemnity");
     }
-    if (!familyBlocked(data, "indemnity", triggers.thirdPartyIp) && triggers.thirdPartyIp && hasSignal(clauseSignals, "third-party IP")) {
+    if (activate("indemnity", triggers.thirdPartyIp, ["third-party IP", "intellectual property", "indemnity"])) {
       addUnique(tags, "third-party IP claim");
     }
-    if (!familyBlocked(data, "liquidated_damages", triggers.penalty) && triggers.penalty && (hasAny(factText(data), ["penalty", "liquidated damages"]) || hasSignal(clauseSignals, "liquidated damages"))) {
+    if (activate("liquidated_damages", triggers.penalty, ["liquidated damages", "penalty"])) {
       addUnique(tags, "liquidated damages");
     }
-    if (!familyBlocked(data, "force_majeure", triggers.forceMajeure) && triggers.forceMajeure && hasSignal(clauseSignals, "force majeure")) {
+    if (activate("force_majeure", triggers.forceMajeure, ["force majeure"])) {
       addUnique(tags, "force majeure");
     }
-    if (!familyBlocked(data, "confidentiality", triggers.confidentiality) && triggers.confidentiality && hasSignal(clauseSignals, "confidentiality")) {
+    if (activate("confidentiality", triggers.confidentiality, ["confidentiality", "confidential"])) {
       addUnique(tags, "confidentiality");
     }
-    if (!familyBlocked(data, "confidentiality", triggers.unauthorizedDisclosure) && triggers.unauthorizedDisclosure && hasSignal(clauseSignals, "confidentiality")) {
+    if (activate("confidentiality", triggers.unauthorizedDisclosure, ["confidentiality", "confidential"])) {
       addUnique(tags, "unauthorized disclosure");
     }
-    if (triggers.liabilityCapCarveout && hasSignal(clauseSignals, "carve-out")) {
+    if (activate("liability_limitation", triggers.liabilityCapCarveout, ["carve-out"])) {
       addUnique(tags, "liability cap carve-out");
     }
 
@@ -2496,7 +2510,7 @@
 
   function buildNextSteps(data, diagnosis) {
     const steps = [];
-    const tags = diagnosis.activeIssueTags || diagnosis.issueTags || [];
+    const tags = diagnosis.active_issue_tags || diagnosis.activeIssueTags || diagnosis.issue_tags || diagnosis.issueTags || [];
     const fmTimeline = extractForceMajeureTimeline(data);
     const refundTimeline = extractRefundTerminationTimeline(data);
     const confidentialityTimeline = extractConfidentialityIndemnityTimeline(data);
@@ -2836,17 +2850,78 @@
     return facts;
   }
 
+  function normalizeFinalDiagnosis(diagnosis) {
+    const source = diagnosis && typeof diagnosis === "object" ? diagnosis : {};
+    const activeIssueTags = normalizeStringList(source.active_issue_tags);
+    const legacyIssueTags = normalizeStringList(source.issue_tags || source.activeIssueTags || source.issueTags);
+    const finalActiveIssueTags = activeIssueTags.length ? activeIssueTags : legacyIssueTags;
+    const clauseSignals = normalizeStringList(source.clause_signals);
+    const disputeTypes = normalizeStringList(source.dispute_types);
+    const finalDisputeTypes = disputeTypes.length ? disputeTypes : normalizeStringList([source.dispute_type || "Other"]);
+    const evidenceGaps = normalizeStringList(source.evidence_gaps);
+    const risk = normalizeRisk(source.risk);
+    const riskSignal = risk.level !== "unclear" ? risk.level : source.risk_signal || "unclear";
+    const disputeSummary = source.dispute_summary || source.summary || "";
+
+    return {
+      ...source,
+      summary: disputeSummary,
+      dispute_summary: disputeSummary,
+      contract_type: source.contract_type || "Other",
+      dispute_types: finalDisputeTypes,
+      dispute_type: finalDisputeTypes.join("; "),
+      active_issue_tags: finalActiveIssueTags.length ? finalActiveIssueTags : ["unclear"],
+      issue_tags: finalActiveIssueTags.length ? [...finalActiveIssueTags] : ["unclear"],
+      clause_signals: clauseSignals,
+      relevant_clause_signals: [...clauseSignals],
+      key_issues: normalizeStringList(source.key_issues),
+      timeline_facts: normalizeStringList(source.timeline_facts),
+      position_matrix: normalizePositionMatrix(source.position_matrix),
+      evidence_gaps: evidenceGaps,
+      risk: {
+        ...risk,
+        level: riskSignal,
+        critical_evidence_gaps: normalizeStringList(risk.critical_evidence_gaps)
+      },
+      risk_signal: riskSignal,
+      suggested_next_steps: normalizeStringList(source.suggested_next_steps),
+      report_outputs: normalizeStringList(source.report_outputs || ["markdown", "json-style"])
+    };
+  }
+
+  function normalizeStringList(items) {
+    return uniqueValues(Array.isArray(items) ? items : []);
+  }
+
+  function normalizeRisk(risk) {
+    const source = risk && typeof risk === "object" ? risk : {};
+    return {
+      ...source,
+      level: source.level || "unclear",
+      rationale: normalizeStringList(source.rationale || []),
+      critical_evidence_gaps: normalizeStringList(source.critical_evidence_gaps || []),
+      evidence_dependent: Boolean(source.evidence_dependent)
+    };
+  }
+
+  function normalizePositionMatrix(positionMatrix) {
+    const source = positionMatrix && typeof positionMatrix === "object" ? positionMatrix : {};
+    return {
+      claimant: source.claimant || "No claimant position provided.",
+      respondent: source.respondent || "No respondent position provided.",
+      contested_facts: normalizeStringList(source.contested_facts)
+    };
+  }
+
   function diagnose(data) {
     const triggers = extractFactualTriggers(data);
     const relevantClauseSignals = buildClauseSignals(data);
     const activeIssueTags = deriveActiveIssueTags(data, relevantClauseSignals, triggers);
     const evidenceGaps = buildEvidenceGaps(data, activeIssueTags, relevantClauseSignals, triggers);
     const timelineFacts = extractTimelineFacts(data, activeIssueTags, relevantClauseSignals, evidenceGaps);
-    const risk = scoreRisk(data, activeIssueTags, evidenceGaps, timelineFacts, triggers);
-    const keyIssues = buildIssues(data, activeIssueTags, relevantClauseSignals, timelineFacts, triggers);
     const detectedDisputeTypes = detectDisputeTypes(data, activeIssueTags, triggers);
 
-    const diagnosis = {
+    let finalDiagnosis = normalizeFinalDiagnosis({
       case_type: normalize(detectedDisputeTypes[0] || data.disputeType || "other").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "other",
       contract_type: detectContractTypes(data).join("; "),
       dispute_type: detectedDisputeTypes.join("; "),
@@ -2854,12 +2929,17 @@
       diagnosis_depth: data.diagnosisDepth,
       output_format_preference: data.outputFormat,
       risk_mode: data.riskMode,
-      risk_signal: risk.level,
-      risk,
+      risk_signal: "unclear",
+      risk: {
+        level: "unclear",
+        rationale: [],
+        critical_evidence_gaps: [],
+        evidence_dependent: false
+      },
       active_issue_tags: [...activeIssueTags],
       issue_tags: [...activeIssueTags],
       dispute_summary: summarize(data),
-      key_issues: [...keyIssues],
+      key_issues: [],
       clause_signals: [...relevantClauseSignals],
       relevant_clause_signals: [...relevantClauseSignals],
       timeline_facts: [...timelineFacts],
@@ -2869,15 +2949,36 @@
         contested_facts: contestedFacts(data)
       },
       evidence_gaps: [...evidenceGaps],
-      suggested_next_steps: []
-    };
-
-    diagnosis.suggested_next_steps = buildNextSteps(data, {
-      activeIssueTags: diagnosis.active_issue_tags,
-      evidenceGaps: diagnosis.evidence_gaps
+      suggested_next_steps: [],
+      report_outputs: ["markdown", "json-style"]
     });
 
-    return diagnosis;
+    const keyIssues = buildIssues(
+      data,
+      finalDiagnosis.active_issue_tags,
+      finalDiagnosis.clause_signals,
+      finalDiagnosis.timeline_facts,
+      triggers
+    );
+    const risk = scoreRisk(
+      data,
+      finalDiagnosis.active_issue_tags,
+      finalDiagnosis.evidence_gaps,
+      finalDiagnosis.timeline_facts,
+      triggers
+    );
+    finalDiagnosis = normalizeFinalDiagnosis({
+      ...finalDiagnosis,
+      key_issues: keyIssues,
+      risk,
+      risk_signal: risk.level
+    });
+    finalDiagnosis = normalizeFinalDiagnosis({
+      ...finalDiagnosis,
+      suggested_next_steps: buildNextSteps(data, finalDiagnosis)
+    });
+
+    return finalDiagnosis;
   }
 
   function detectContractTypes(data) {
@@ -3013,60 +3114,74 @@
   }
 
   function markdownReport(diagnosis) {
+    const finalDiagnosis = normalizeFinalDiagnosis(diagnosis);
     return [
       `# Contract2Agent Diagnosis Preview`,
       "",
-      `**Contract type:** ${diagnosis.contract_type}`,
-      `**Dispute type:** ${diagnosis.dispute_type}`,
-      `**Risk signal:** ${diagnosis.risk_signal}`,
-      `**Diagnosis depth:** ${diagnosis.diagnosis_depth}`,
+      `**Contract type:** ${finalDiagnosis.contract_type}`,
+      `**Dispute type:** ${finalDiagnosis.dispute_type}`,
+      `**Risk signal:** ${finalDiagnosis.risk_signal}`,
+      `**Diagnosis depth:** ${finalDiagnosis.diagnosis_depth}`,
       "",
       "## Dispute Summary",
-      diagnosis.dispute_summary,
+      finalDiagnosis.dispute_summary,
       "",
       "## Active Issue Tags",
-      ...diagnosis.active_issue_tags.map((tag) => `- ${tag}`),
+      ...finalDiagnosis.active_issue_tags.map((tag) => `- ${tag}`),
       "",
       "## Key Issues",
-      ...diagnosis.key_issues.map((issue) => `- ${issue}`),
+      ...finalDiagnosis.key_issues.map((issue) => `- ${issue}`),
       "",
       "## Clause Signals",
-      ...diagnosis.clause_signals.map((signal) => `- ${signal}`),
+      ...finalDiagnosis.clause_signals.map((signal) => `- ${signal}`),
       "",
       "## Timeline Facts",
-      ...diagnosis.timeline_facts.map((fact) => `- ${fact}`),
+      ...finalDiagnosis.timeline_facts.map((fact) => `- ${fact}`),
       "",
       "## Claimant vs Respondent",
-      `- Claimant: ${diagnosis.position_matrix.claimant}`,
-      `- Respondent: ${diagnosis.position_matrix.respondent}`,
-      `- Contested facts: ${diagnosis.position_matrix.contested_facts.join("; ")}`,
+      `- Claimant: ${finalDiagnosis.position_matrix.claimant}`,
+      `- Respondent: ${finalDiagnosis.position_matrix.respondent}`,
+      `- Contested facts: ${finalDiagnosis.position_matrix.contested_facts.join("; ")}`,
       "",
       "## Risk Rationale",
-      ...diagnosis.risk.rationale.map((reason) => `- ${reason}`),
+      ...finalDiagnosis.risk.rationale.map((reason) => `- ${reason}`),
       "",
       "## Evidence Gaps",
-      ...diagnosis.evidence_gaps.map((gap) => `- ${gap}`),
+      ...finalDiagnosis.evidence_gaps.map((gap) => `- ${gap}`),
       "",
       "## Suggested Next Steps",
-      ...diagnosis.suggested_next_steps.map((step) => `- ${step}`)
+      ...finalDiagnosis.suggested_next_steps.map((step) => `- ${step}`)
     ].join("\n");
   }
 
   function structuredPreview(diagnosis) {
+    const finalDiagnosis = normalizeFinalDiagnosis(diagnosis);
     return {
-      summary: diagnosis.dispute_summary,
+      summary: finalDiagnosis.dispute_summary,
       detected: {
-        contract_type: diagnosis.contract_type,
-        dispute_type: diagnosis.dispute_type,
-        active_issue_tags: diagnosis.active_issue_tags,
-        clause_signals: diagnosis.clause_signals
+        contract_type: finalDiagnosis.contract_type,
+        dispute_type: finalDiagnosis.dispute_type,
+        active_issue_tags: finalDiagnosis.active_issue_tags,
+        clause_signals: finalDiagnosis.clause_signals
       },
-      timeline_facts: diagnosis.timeline_facts,
-      evidence_gaps: diagnosis.evidence_gaps,
-      risk: diagnosis.risk,
-      risk_signal: diagnosis.risk_signal,
-      report_outputs: ["markdown", "json-style"]
+      timeline_facts: finalDiagnosis.timeline_facts,
+      evidence_gaps: finalDiagnosis.evidence_gaps,
+      risk: finalDiagnosis.risk,
+      risk_signal: finalDiagnosis.risk_signal,
+      report_outputs: finalDiagnosis.report_outputs
     };
+  }
+
+  function jsonReport(diagnosis) {
+    const finalDiagnosis = normalizeFinalDiagnosis(diagnosis);
+    return JSON.stringify(
+      {
+        ...finalDiagnosis,
+        structured_diagnosis_preview: structuredPreview(finalDiagnosis)
+      },
+      null,
+      2
+    );
   }
 
   function analyzeDispute(input) {
@@ -3074,6 +3189,7 @@
   }
 
   function computeEvaluationMetrics(input, diagnosis) {
+    const finalDiagnosis = normalizeFinalDiagnosis(diagnosis);
     const requiredFields = [
       "contractText",
       "disputeDescription",
@@ -3084,13 +3200,13 @@
     ];
     const completed = requiredFields.filter((field) => input[field] && input[field].length >= 12);
     const inputCompleteness = Math.round((completed.length / requiredFields.length) * 100);
-    const evidenceGapCount = diagnosis.evidence_gaps.filter(
+    const evidenceGapCount = finalDiagnosis.evidence_gaps.filter(
       (gap) => !normalize(gap).startsWith("no obvious")
     ).length;
-    const clauseSignalCount = diagnosis.relevant_clause_signals.filter(
+    const clauseSignalCount = finalDiagnosis.relevant_clause_signals.filter(
       (signal) => !normalize(signal).startsWith("no strong")
     ).length;
-    const detectedIssueCount = diagnosis.key_issues.filter(
+    const detectedIssueCount = finalDiagnosis.key_issues.filter(
       (issue) => !normalize(issue).includes("unclear")
     ).length;
     const evidenceSignals = countGroup(input.evidence, "evidence") + dateSignalCount(input.evidence);
@@ -3108,7 +3224,7 @@
         : "Needs more input";
     const markdownReady = diagnosis ? "Ready" : "Pending";
     const jsonReady = diagnosis ? "Ready" : "Pending";
-    const suggestedGoldenCase = caseNameFor(input, diagnosis);
+    const suggestedGoldenCase = caseNameFor(input, finalDiagnosis);
 
     return {
       inputCompleteness,
@@ -3116,7 +3232,7 @@
       detectedIssueCount,
       clauseSignalCount,
       evidenceGapCount,
-      riskSignal: diagnosis.risk_signal,
+      riskSignal: finalDiagnosis.risk_signal,
       structuredOutputReady,
       markdownReady,
       jsonReady,
@@ -3132,10 +3248,11 @@
   }
 
   function buildTestCasePreview(input, diagnosis, metrics) {
+    const finalDiagnosis = normalizeFinalDiagnosis(diagnosis);
     return {
       case_name: metrics.suggestedGoldenCase,
       contract_type: input.contractType || "Other",
-      dispute_type: diagnosis.case_type,
+      dispute_type: finalDiagnosis.case_type,
       risk_mode: input.riskMode || "Balanced",
       input_fixture: {
         has_contract_text: Boolean(input.contractText),
@@ -3144,10 +3261,10 @@
         has_evidence: Boolean(input.evidence)
       },
       expected_outputs: {
-        must_include_issues: (diagnosis.active_issue_tags || []).filter((tag) => tag !== "unclear"),
-        must_include_evidence_gaps: [...diagnosis.evidence_gaps],
+        must_include_issues: finalDiagnosis.active_issue_tags.filter((tag) => tag !== "unclear"),
+        must_include_evidence_gaps: [...finalDiagnosis.evidence_gaps],
         minimum_clause_signals: metrics.clauseSignalCount,
-        risk_signal: diagnosis.risk_signal
+        risk_signal: finalDiagnosis.risk_signal
       },
       evaluation_checks: {
         input_completeness: `${metrics.inputCompleteness}%`,
@@ -3157,6 +3274,15 @@
         json_export: metrics.jsonReady,
         golden_style_checks: metrics.ruleChecksPassed
       }
+    };
+  }
+
+  function buildEvaluationPreview(input, diagnosis) {
+    const finalDiagnosis = normalizeFinalDiagnosis(diagnosis);
+    const metrics = computeEvaluationMetrics(input, finalDiagnosis);
+    return {
+      metrics,
+      testCase: buildTestCasePreview(input, finalDiagnosis, metrics)
     };
   }
 
@@ -3202,7 +3328,8 @@
   }
 
   function caseNameFor(input, diagnosis) {
-    const activeTags = (diagnosis.active_issue_tags || diagnosis.issue_tags || []).filter((tag) => normalize(tag) !== "unclear");
+    const finalDiagnosis = normalizeFinalDiagnosis(diagnosis);
+    const activeTags = finalDiagnosis.active_issue_tags.filter((tag) => normalize(tag) !== "unclear");
     let caseTags = activeTags.filter((tag) => !hasAny(tag, ["notice", "damages", "liability limitation", "liability cap carve-out"]));
     if (hasTag(activeTags, "confidentiality") && hasTag(activeTags, "indemnity")) {
       caseTags = ["confidentiality", "indemnity"];
@@ -3245,37 +3372,32 @@
 
   function render(diagnosis, input) {
     const currentInput = input || collectInput();
-    latestDiagnosis = diagnosis;
-    latestMarkdown = markdownReport(diagnosis);
-    latestJson = JSON.stringify(
-      {
-        ...diagnosis,
-        structured_diagnosis_preview: structuredPreview(diagnosis)
-      },
-      null,
-      2
-    );
-    const metrics = computeEvaluationMetrics(currentInput, diagnosis);
-    const testCase = buildTestCasePreview(currentInput, diagnosis, metrics);
+    const finalDiagnosis = normalizeFinalDiagnosis(diagnosis);
+    latestDiagnosis = finalDiagnosis;
+    latestMarkdown = markdownReport(finalDiagnosis);
+    latestJson = jsonReport(finalDiagnosis);
+    const evaluationPreview = buildEvaluationPreview(currentInput, finalDiagnosis);
+    const metrics = evaluationPreview.metrics;
+    const testCase = evaluationPreview.testCase;
 
-    riskBadge.className = `risk-badge risk-${diagnosis.risk_signal}`;
-    riskBadge.textContent = diagnosis.risk_signal;
+    riskBadge.className = `risk-badge risk-${finalDiagnosis.risk_signal}`;
+    riskBadge.textContent = finalDiagnosis.risk_signal;
 
     resultOutput.innerHTML = [
-      `<section class="result-block"><h4>Dispute summary</h4><p>${escapeHtml(diagnosis.dispute_summary)}</p></section>`,
+      `<section class="result-block"><h4>Dispute summary</h4><p>${escapeHtml(finalDiagnosis.dispute_summary)}</p></section>`,
       `<section class="result-block"><h4>Detected contract/dispute type</h4>${tagsHtml([
-        diagnosis.contract_type,
-        diagnosis.dispute_type
+        finalDiagnosis.contract_type,
+        finalDiagnosis.dispute_type
       ])}</section>`,
-      `<section class="result-block"><h4>Active issue tags</h4>${tagsHtml(diagnosis.active_issue_tags)}</section>`,
-      `<section class="result-block"><h4>Key issues</h4>${listHtml(diagnosis.key_issues, "issue-list")}</section>`,
-      `<section class="result-block"><h4>Relevant clauses or clause signals</h4>${listHtml(diagnosis.clause_signals, "issue-list")}</section>`,
-      `<section class="result-block"><h4>Timeline facts</h4>${listHtml(diagnosis.timeline_facts, "issue-list")}</section>`,
-      `<section class="result-block"><h4>Claimant vs respondent position matrix</h4><div class="matrix"><div><strong>Claimant</strong><p>${escapeHtml(diagnosis.position_matrix.claimant)}</p></div><div><strong>Respondent</strong><p>${escapeHtml(diagnosis.position_matrix.respondent)}</p></div></div><p><strong>Contested facts:</strong> ${escapeHtml(diagnosis.position_matrix.contested_facts.join("; "))}</p></section>`,
-      `<section class="result-block"><h4>Evidence gaps</h4>${listHtml(diagnosis.evidence_gaps, "gap-list")}</section>`,
-      `<section class="result-block"><h4>Risk signal</h4><p>${escapeHtml(diagnosis.risk_signal)} risk under ${escapeHtml(diagnosis.risk_mode)} mode.</p>${listHtml(diagnosis.risk.rationale, "gap-list")}</section>`,
-      `<section class="result-block"><h4>Suggested next steps</h4>${listHtml(diagnosis.suggested_next_steps, "next-step-list")}</section>`,
-      `<section class="result-block"><h4>Structured diagnosis preview</h4><pre class="preview-code"><code>${escapeHtml(JSON.stringify(structuredPreview(diagnosis), null, 2))}</code></pre></section>`,
+      `<section class="result-block"><h4>Active issue tags</h4>${tagsHtml(finalDiagnosis.active_issue_tags)}</section>`,
+      `<section class="result-block"><h4>Key issues</h4>${listHtml(finalDiagnosis.key_issues, "issue-list")}</section>`,
+      `<section class="result-block"><h4>Relevant clauses or clause signals</h4>${listHtml(finalDiagnosis.clause_signals, "issue-list")}</section>`,
+      `<section class="result-block"><h4>Timeline facts</h4>${listHtml(finalDiagnosis.timeline_facts, "issue-list")}</section>`,
+      `<section class="result-block"><h4>Claimant vs respondent position matrix</h4><div class="matrix"><div><strong>Claimant</strong><p>${escapeHtml(finalDiagnosis.position_matrix.claimant)}</p></div><div><strong>Respondent</strong><p>${escapeHtml(finalDiagnosis.position_matrix.respondent)}</p></div></div><p><strong>Contested facts:</strong> ${escapeHtml(finalDiagnosis.position_matrix.contested_facts.join("; "))}</p></section>`,
+      `<section class="result-block"><h4>Evidence gaps</h4>${listHtml(finalDiagnosis.evidence_gaps, "gap-list")}</section>`,
+      `<section class="result-block"><h4>Risk signal</h4><p>${escapeHtml(finalDiagnosis.risk_signal)} risk under ${escapeHtml(finalDiagnosis.risk_mode)} mode.</p>${listHtml(finalDiagnosis.risk.rationale, "gap-list")}</section>`,
+      `<section class="result-block"><h4>Suggested next steps</h4>${listHtml(finalDiagnosis.suggested_next_steps, "next-step-list")}</section>`,
+      `<section class="result-block"><h4>Structured diagnosis preview</h4><pre class="preview-code"><code>${escapeHtml(JSON.stringify(structuredPreview(finalDiagnosis), null, 2))}</code></pre></section>`,
       `<section class="result-block"><h4>Markdown-style report preview</h4><pre class="preview-code"><code>${escapeHtml(latestMarkdown)}</code></pre></section>`,
       `<section class="result-block"><h4>JSON-style output preview</h4><pre class="preview-code"><code>${escapeHtml(latestJson)}</code></pre></section>`
     ].join("");

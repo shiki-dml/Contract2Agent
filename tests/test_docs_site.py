@@ -199,6 +199,193 @@ POSITIVE_FORCE_MAJEURE_DELIVERY_FIXTURE = {
 }
 
 
+SALES_FORCE_MAJEURE_CLAUSE_ONLY_FIXTURE = {
+    "contractType": "Sales Contract",
+    "disputeType": "Late Delivery",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Evidence-first",
+    "desiredOutcome": "Assess late shipment remedies and confirm ordinary supply-delay defenses.",
+    "contractText": (
+        "Seller must deliver conforming equipment by May 15. The agreement includes a "
+        "force majeure clause covering natural disasters, government orders, port "
+        "closures, strikes, war, emergency closures, and extraordinary external events "
+        "outside the affected party's control. The affected party must provide prompt "
+        "written force majeure notice and use commercially reasonable mitigation. "
+        "Payment is due net 30 after accepted delivery."
+    ),
+    "disputeDescription": (
+        "Seller shipped the equipment on May 25 after an ordinary component backlog. "
+        "Buyer says the shipment was late and asks whether it may reject or recover "
+        "ordinary delay damages. No party claims force majeure. No force majeure notice "
+        "was sent. There was no government order, no natural disaster, no port closure, "
+        "no strike, no war, no emergency closure, and no extraordinary external event."
+    ),
+    "claimantPosition": (
+        "Buyer says the delay was a commercial supply problem and seeks late-shipment "
+        "remedies. Buyer does not seek a force majeure ruling."
+    ),
+    "respondentPosition": (
+        "Seller says the backlog was ordinary vendor delay and does not invoke force "
+        "majeure or any external uncontrollable event."
+    ),
+    "evidence": (
+        "Available:\n"
+        "- Purchase order delivery schedule\n"
+        "- Carrier record showing May 25 shipment\n"
+        "- Vendor backlog email describing ordinary component shortages\n\n"
+        "Missing or unclear:\n"
+        "- Final delay damages calculation"
+    ),
+    "metadata": '{"product":"equipment"}',
+}
+
+
+CONFIDENTIALITY_CLAUSE_ONLY_FIXTURE = {
+    "contractType": "Service Agreement",
+    "disputeType": "Service Performance",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Balanced",
+    "desiredOutcome": "Assess service completion and payment holdback.",
+    "contractText": (
+        "Each party must protect Confidential Information and may not make restricted "
+        "disclosures except to employees who need access. The agreement also contains "
+        "standard non-disclosure obligations."
+    ),
+    "disputeDescription": (
+        "The customer withheld final payment because the provider missed two reporting "
+        "deadlines. The parties agree there was no confidentiality breach, no confidential "
+        "information disclosure, no unauthorized disclosure, and no public disclosure."
+    ),
+    "claimantPosition": "Provider seeks payment for completed reporting work.",
+    "respondentPosition": "Customer disputes timeliness only and does not allege any disclosure.",
+    "evidence": "Available:\n- Reporting schedule\n- Final report delivery email\n- Payment holdback ledger",
+    "metadata": '{"issue":"reporting delay"}',
+}
+
+
+INDEMNITY_CLAUSE_ONLY_FIXTURE = {
+    "contractType": "Master Services Agreement",
+    "disputeType": "Service Performance",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Balanced",
+    "desiredOutcome": "Assess service delay and fee credit.",
+    "contractText": (
+        "Provider will indemnify, defend, and hold harmless Customer from covered "
+        "third-party claims. The indemnification section includes a defense obligation "
+        "after timely tender."
+    ),
+    "disputeDescription": (
+        "The dispute concerns a missed configuration deadline. There is no third-party "
+        "claim, no indemnity claim, no indemnity tender, and no defense demand."
+    ),
+    "claimantPosition": "Customer seeks a service fee credit for the missed configuration deadline.",
+    "respondentPosition": "Provider says the configuration delay was cured and no third party is involved.",
+    "evidence": "Available:\n- Configuration timeline\n- Support messages\n- Cure confirmation email",
+    "metadata": '{"issue":"configuration delay"}',
+}
+
+
+LIQUIDATED_DAMAGES_ACTIVE_FIXTURE = {
+    "contractType": "Sales Contract",
+    "disputeType": "Late Delivery",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Evidence-first",
+    "desiredOutcome": "Determine liquidated damages enforceability and calculation.",
+    "contractText": (
+        "Seller must deliver by July 1. For late delivery, Buyer may recover liquidated "
+        "damages of 1% of the order value per full week, capped at 8%."
+    ),
+    "disputeDescription": (
+        "Seller delivered on July 22. Buyer seeks liquidated damages for the late "
+        "delivery period. Seller disputes liquidated damages and argues the formula is "
+        "an unenforceable penalty."
+    ),
+    "claimantPosition": "Buyer seeks liquidated damages for three full weeks of delay.",
+    "respondentPosition": "Seller says the liquidated damages amount is a penalty and exceeds any real loss.",
+    "evidence": "Available:\n- July 1 delivery deadline\n- July 22 delivery receipt\n- Liquidated damages calculation",
+    "metadata": '{"delivery":"late"}',
+}
+
+
+LIQUIDATED_DAMAGES_CLAUSE_ONLY_FIXTURE = {
+    "contractType": "Sales Contract",
+    "disputeType": "Quality Dispute",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Balanced",
+    "desiredOutcome": "Assess warranty repair obligations.",
+    "contractText": (
+        "The contract includes a liquidated damages clause for late delivery and a cap "
+        "on stipulated delay damages."
+    ),
+    "disputeDescription": (
+        "The goods arrived on time, but Buyer says several units failed inspection. No "
+        "party seeks liquidated damages, no party disputes a penalty, and the dispute "
+        "does not involve late performance."
+    ),
+    "claimantPosition": "Buyer seeks repair or replacement of defective units.",
+    "respondentPosition": "Seller says the units met the warranty specification.",
+    "evidence": "Available:\n- Delivery receipt\n- Inspection report\n- Warranty correspondence",
+    "metadata": '{"issue":"quality"}',
+}
+
+
+LIABILITY_LIMITATION_ACTIVE_FIXTURE = {
+    "contractType": "Sales Contract",
+    "disputeType": "Damages/Liability",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Balanced",
+    "desiredOutcome": "Determine damages and whether the liability cap limits recovery.",
+    "contractText": (
+        "Total liability is capped at amounts paid under the purchase order. Neither "
+        "party may recover consequential damages or lost profits."
+    ),
+    "disputeDescription": (
+        "Buyer seeks monetary damages for replacement parts and installation downtime. "
+        "Seller argues the liability cap applies and that damages beyond the cap are excluded."
+    ),
+    "claimantPosition": "Buyer says direct damages exceed the contract cap.",
+    "respondentPosition": "Seller says the cap limits recovery.",
+    "evidence": "Available:\n- Replacement parts quote\n- Repair labor estimate\n- Damages spreadsheet",
+    "metadata": '{"remedy":"damages"}',
+}
+
+
+ALTERNATIVE_SUPPLIER_INVOICE_FIXTURE = {
+    "contractType": "Sales Contract",
+    "disputeType": "Late Delivery",
+    "outputFormat": "Detailed",
+    "diagnosisDepth": "Detailed",
+    "riskMode": "Evidence-first",
+    "desiredOutcome": "Assess late delivery, cover purchase, and damages.",
+    "contractText": (
+        "Seller must ship components by August 1. Buyer may recover reasonable direct "
+        "cover costs for late delivery. Payment terms are net 30 after accepted delivery."
+    ),
+    "disputeDescription": (
+        "Seller shipped components on August 12. Buyer bought substitute components "
+        "from an alternate supplier to keep production running and seeks cover costs. "
+        "There is no unpaid invoice, no disputed invoice, no billing dispute, no invoice "
+        "nonpayment, and no invoice dispute notice."
+    ),
+    "claimantPosition": "Buyer seeks the incremental substitute-purchase cost caused by late delivery.",
+    "respondentPosition": "Seller disputes causation and reasonableness of the cover purchase.",
+    "evidence": (
+        "Available:\n"
+        "- August 1 shipment deadline\n"
+        "- August 12 carrier record\n"
+        "- Alternative supplier invoice dated August 6 used as cover-cost evidence\n"
+        "- Production schedule impact memo"
+    ),
+    "metadata": '{"remedy":"cover costs"}',
+}
+
+
 REFUND_TERMINATION_ACCEPTANCE_FIXTURE = {
     "contractType": "Service Agreement",
     "disputeType": "Refund / Termination / Acceptance",
@@ -704,6 +891,275 @@ def test_playground_exports_use_corrected_structured_diagnosis() -> None:
     assert "force majeure" not in active_section.lower()
     assert "## Clause Signals" in markdown
     assert "## Timeline Facts" in markdown
+
+
+def test_playground_final_diagnosis_is_source_for_json_and_markdown_exports() -> None:
+    output = _run_playground_diagnosis(CONFIDENTIALITY_IP_INDEMNITY_FIXTURE)
+    diagnosis = output["diagnosis"]
+    exported = json.loads(output["json"])
+    markdown = output["markdown"]
+
+    assert _markdown_list_items(markdown, "Active Issue Tags") == diagnosis["active_issue_tags"]
+    assert _markdown_list_items(markdown, "Key Issues") == diagnosis["key_issues"]
+    assert _markdown_list_items(markdown, "Timeline Facts") == diagnosis["timeline_facts"]
+    assert _markdown_list_items(markdown, "Evidence Gaps") == diagnosis["evidence_gaps"]
+    assert _markdown_list_items(markdown, "Suggested Next Steps") == diagnosis["suggested_next_steps"]
+
+    for field in (
+        "contract_type",
+        "dispute_type",
+        "active_issue_tags",
+        "key_issues",
+        "clause_signals",
+        "timeline_facts",
+        "evidence_gaps",
+        "risk",
+        "risk_signal",
+        "suggested_next_steps",
+    ):
+        assert exported[field] == diagnosis[field]
+    assert exported["issue_tags"] == diagnosis["active_issue_tags"]
+    assert exported["structured_diagnosis_preview"]["detected"]["active_issue_tags"] == diagnosis["active_issue_tags"]
+    assert exported["structured_diagnosis_preview"]["timeline_facts"] == diagnosis["timeline_facts"]
+    assert exported["structured_diagnosis_preview"]["evidence_gaps"] == diagnosis["evidence_gaps"]
+
+
+def test_playground_evaluation_preview_uses_final_diagnosis() -> None:
+    output = _run_playground_diagnosis(REFUND_TERMINATION_ACCEPTANCE_FIXTURE)
+    diagnosis = output["diagnosis"]
+    test_case = output["test_case"]
+
+    assert test_case["expected_outputs"]["must_include_issues"] == [
+        tag for tag in diagnosis["active_issue_tags"] if tag != "unclear"
+    ]
+    assert test_case["expected_outputs"]["must_include_evidence_gaps"] == diagnosis["evidence_gaps"]
+    assert test_case["expected_outputs"]["risk_signal"] == diagnosis["risk_signal"]
+    assert set(test_case["expected_outputs"]["must_include_issues"]) <= set(diagnosis["active_issue_tags"])
+    assert "saas" not in test_case["case_name"]
+    assert "force_majeure" not in test_case["case_name"]
+
+
+def test_playground_no_post_final_regeneration_of_active_issues() -> None:
+    output = _run_playground_diagnosis(LEASE_REPAIR_ABATEMENT_DEPOSIT_FIXTURE)
+    diagnosis = output["diagnosis"]
+    exported = json.loads(output["json"])
+    markdown = output["markdown"]
+    test_case = output["test_case"]
+    active_tags = diagnosis["active_issue_tags"]
+
+    assert _markdown_list_items(markdown, "Active Issue Tags") == active_tags
+    assert exported["active_issue_tags"] == active_tags
+    assert test_case["expected_outputs"]["must_include_issues"] == [
+        tag for tag in active_tags if tag != "unclear"
+    ]
+
+    active_issue_reason = next(
+        reason for reason in diagnosis["risk"]["rationale"]
+        if reason.startswith("Active issues detected:")
+    )
+    listed_in_risk = [
+        item.strip().removesuffix(".")
+        for item in active_issue_reason.removeprefix("Active issues detected:").split(",")
+    ]
+    assert listed_in_risk == active_tags
+
+    inactive_issue_terms = {
+        "force majeure",
+        "SLA",
+        "service credit",
+        "suspension",
+        "invoice dispute",
+        "refund",
+        "confidentiality",
+        "indemnity",
+        "third-party IP claim",
+        "liquidated damages",
+        "cover costs",
+    }
+    inactive_issue_terms -= set(active_tags)
+    surface_text = "\n".join(
+        [
+            "\n".join(_markdown_list_items(markdown, "Active Issue Tags")),
+            "\n".join(exported["active_issue_tags"]),
+            "\n".join(test_case["expected_outputs"]["must_include_issues"]),
+            active_issue_reason,
+        ]
+    ).lower()
+    for inactive in inactive_issue_terms:
+        assert inactive.lower() not in surface_text
+
+
+def test_playground_final_diagnosis_runs_have_fresh_state() -> None:
+    force_then_refund = _run_playground_diagnoses_sequentially(
+        [POSITIVE_FORCE_MAJEURE_DELIVERY_FIXTURE, REFUND_TERMINATION_ACCEPTANCE_FIXTURE]
+    )
+    first, second = force_then_refund
+
+    assert first["active_issue_tags"] != second["active_issue_tags"]
+    assert second["issue_tags"] == second["active_issue_tags"]
+    second_output_text = json.dumps(
+        {
+            "active_issue_tags": second["active_issue_tags"],
+            "key_issues": second["key_issues"],
+            "evidence_gaps": second["evidence_gaps"],
+            "timeline_facts": second["timeline_facts"],
+            "suggested_next_steps": second["suggested_next_steps"],
+            "risk": second["risk"],
+        }
+    ).lower()
+    for leaked in (
+        "government emergency order",
+        "force majeure notice",
+        "temporary consultant",
+        "remote migration tools",
+        "alternate staffing",
+        "cover cost",
+        "liquidated damages",
+    ):
+        assert leaked not in second_output_text
+
+
+def test_playground_force_majeure_clause_only_stays_clause_signal() -> None:
+    output = _run_playground_diagnosis(SALES_FORCE_MAJEURE_CLAUSE_ONLY_FIXTURE)
+    diagnosis = output["diagnosis"]
+    exported = json.loads(output["json"])
+    markdown = output["markdown"]
+    test_case = output["test_case"]
+
+    assert any("force majeure" in signal.lower() for signal in diagnosis["clause_signals"])
+    assert "force majeure" not in diagnosis["active_issue_tags"]
+    assert "Force Majeure" not in diagnosis["dispute_type"]
+    assert "force majeure" not in exported["active_issue_tags"]
+    assert exported["issue_tags"] == diagnosis["active_issue_tags"]
+    assert "force majeure" not in _markdown_list_items(markdown, "Active Issue Tags")
+    assert "force majeure" not in test_case["expected_outputs"]["must_include_issues"]
+
+    clause_only_text = "\n".join(
+        diagnosis["key_issues"] +
+        diagnosis["evidence_gaps"] +
+        diagnosis["suggested_next_steps"] +
+        diagnosis["risk"]["rationale"]
+    ).lower()
+    for forbidden in (
+        "qualifies as force majeure",
+        "invoked external event",
+        "force majeure notice was timely",
+        "force majeure notice delivery",
+        "commercially reasonable mitigation",
+    ):
+        assert forbidden not in clause_only_text
+
+
+def test_playground_positive_force_majeure_still_activates() -> None:
+    output = _run_playground_diagnosis(POSITIVE_FORCE_MAJEURE_DELIVERY_FIXTURE)
+    diagnosis = output["diagnosis"]
+
+    assert any("force majeure" in signal.lower() for signal in diagnosis["clause_signals"])
+    assert "force majeure" in diagnosis["active_issue_tags"]
+    assert "Force Majeure" in diagnosis["dispute_type"]
+    assert any("qualifies as a force majeure event" in issue for issue in diagnosis["key_issues"])
+    assert any("force majeure notice" in step.lower() for step in diagnosis["suggested_next_steps"])
+    assert any("mitigation" in step.lower() for step in diagnosis["suggested_next_steps"])
+
+
+def test_playground_confidentiality_and_indemnity_clause_only_stay_clause_signals() -> None:
+    confidentiality_output = _run_playground_diagnosis(CONFIDENTIALITY_CLAUSE_ONLY_FIXTURE)
+    confidentiality = confidentiality_output["diagnosis"]
+    confidentiality_case = confidentiality_output["test_case"]
+    confidentiality_text = "\n".join(
+        confidentiality["key_issues"] +
+        confidentiality["evidence_gaps"] +
+        confidentiality["suggested_next_steps"]
+    ).lower()
+
+    assert any("confidentiality" in signal.lower() for signal in confidentiality["clause_signals"])
+    assert "confidentiality" not in confidentiality["active_issue_tags"]
+    assert "unauthorized disclosure" not in confidentiality["active_issue_tags"]
+    assert "confidentiality" not in confidentiality_case["expected_outputs"]["must_include_issues"]
+    assert "unauthorized disclosure" not in confidentiality_text
+    assert "public exposure" not in confidentiality_text
+
+    indemnity_output = _run_playground_diagnosis(INDEMNITY_CLAUSE_ONLY_FIXTURE)
+    indemnity = indemnity_output["diagnosis"]
+    indemnity_case = indemnity_output["test_case"]
+    indemnity_text = "\n".join(
+        indemnity["key_issues"] +
+        indemnity["evidence_gaps"] +
+        indemnity["suggested_next_steps"]
+    ).lower()
+
+    assert any("indemnity" in signal.lower() for signal in indemnity["clause_signals"])
+    assert "indemnity" not in indemnity["active_issue_tags"]
+    assert "third-party IP claim" not in indemnity["active_issue_tags"]
+    assert "indemnity" not in indemnity_case["expected_outputs"]["must_include_issues"]
+    assert "third-party ip" not in indemnity_text
+    assert "defense cost" not in indemnity_text
+
+
+def test_playground_liquidated_damages_requires_active_remedy_or_dispute() -> None:
+    active_output = _run_playground_diagnosis(LIQUIDATED_DAMAGES_ACTIVE_FIXTURE)
+    active = active_output["diagnosis"]
+    assert any("liquidated damages" in signal.lower() for signal in active["clause_signals"])
+    assert "liquidated damages" in active["active_issue_tags"]
+    assert any("liquidated damages" in issue.lower() for issue in active["key_issues"])
+    assert any("penalty" in issue.lower() or "calculation" in issue.lower() for issue in active["key_issues"])
+
+    clause_only_output = _run_playground_diagnosis(LIQUIDATED_DAMAGES_CLAUSE_ONLY_FIXTURE)
+    clause_only = clause_only_output["diagnosis"]
+    assert any("liquidated damages" in signal.lower() for signal in clause_only["clause_signals"])
+    assert "liquidated damages" not in clause_only["active_issue_tags"]
+    assert "liquidated damages" not in clause_only_output["test_case"]["expected_outputs"]["must_include_issues"]
+
+
+def test_playground_liability_limitation_active_when_damages_are_disputed() -> None:
+    output = _run_playground_diagnosis(LIABILITY_LIMITATION_ACTIVE_FIXTURE)
+    diagnosis = output["diagnosis"]
+
+    assert any("liability cap" in signal.lower() for signal in diagnosis["clause_signals"])
+    assert "damages" in diagnosis["active_issue_tags"]
+    assert "liability limitation" in diagnosis["active_issue_tags"]
+    assert any("liability cap" in issue.lower() or "cap limits recovery" in issue.lower() for issue in diagnosis["key_issues"])
+
+
+def test_playground_alternative_supplier_invoice_is_not_invoice_dispute() -> None:
+    output = _run_playground_diagnosis(ALTERNATIVE_SUPPLIER_INVOICE_FIXTURE)
+    diagnosis = output["diagnosis"]
+    exported = json.loads(output["json"])
+    markdown = output["markdown"]
+
+    assert "invoice dispute" not in diagnosis["active_issue_tags"]
+    assert "Payment/Invoice Dispute" not in diagnosis["dispute_type"]
+    assert "invoice dispute" not in output["test_case"]["expected_outputs"]["must_include_issues"]
+    assert "invoice dispute" not in exported["active_issue_tags"]
+    assert "invoice dispute" not in _markdown_list_items(markdown, "Active Issue Tags")
+    combined_gaps = "\n".join(diagnosis["evidence_gaps"]).lower()
+    combined_timeline = "\n".join(diagnosis["timeline_facts"]).lower()
+    assert "customer written invoice dispute notice" not in combined_gaps
+    assert "invoice dispute deadline" not in combined_timeline
+
+
+def test_playground_clause_active_separation_survives_sequential_runs() -> None:
+    positive, clause_only = _run_playground_diagnoses_sequentially(
+        [POSITIVE_FORCE_MAJEURE_DELIVERY_FIXTURE, SALES_FORCE_MAJEURE_CLAUSE_ONLY_FIXTURE]
+    )
+
+    assert "force majeure" in positive["active_issue_tags"]
+    assert "force majeure" not in clause_only["active_issue_tags"]
+    assert clause_only["issue_tags"] == clause_only["active_issue_tags"]
+    clause_only_text = json.dumps(
+        {
+            "key_issues": clause_only["key_issues"],
+            "suggested_next_steps": clause_only["suggested_next_steps"],
+            "risk": clause_only["risk"],
+        }
+    ).lower()
+    for leaked in (
+        "force majeure notice was timely",
+        "remote migration tools",
+        "alternate staffing",
+        "government emergency order qualifies",
+    ):
+        assert leaked not in clause_only_text
 
 
 def test_playground_late_delivery_blocks_denied_force_majeure_issue() -> None:
@@ -1942,6 +2398,18 @@ def _is_local_asset_ref(ref: str) -> bool:
     )
 
 
+def _markdown_list_items(markdown: str, heading: str) -> list[str]:
+    section = markdown.split(f"## {heading}", 1)[1]
+    next_heading = section.find("\n## ")
+    if next_heading != -1:
+        section = section[:next_heading]
+    return [
+        line.removeprefix("- ").strip()
+        for line in section.splitlines()
+        if line.startswith("- ")
+    ]
+
+
 def _run_playground_diagnosis(input_case: dict) -> dict:
     node = shutil.which("node")
     if not node:
@@ -1953,6 +2421,7 @@ const fs = require("fs");
 const vm = require("vm");
 const code = fs.readFileSync({json.dumps(str(app_js_path))}, "utf8");
 function makeElement(id) {{
+  const listeners = {{}};
   return {{
     id,
     value: "",
@@ -1961,11 +2430,12 @@ function makeElement(id) {{
     className: "",
     dataset: {{}},
     style: {{}},
-    addEventListener() {{}},
     reset() {{}},
     remove() {{}},
     select() {{}},
     setAttribute() {{}},
+    addEventListener(type, handler) {{ listeners[type] = handler; }},
+    listeners,
     classList: {{ toggle() {{}}, remove() {{}}, add() {{}} }}
   }};
 }}
@@ -2004,7 +2474,8 @@ const sampleButtons = [
 ].map((sample) => ({{
   dataset: {{ sample }},
   classList: {{ toggle() {{}}, remove() {{}}, add() {{}} }},
-  addEventListener() {{}}
+  listeners: {{}},
+  addEventListener(type, handler) {{ this.listeners[type] = handler; }}
 }}));
 const document = {{
   getElementById(id) {{
@@ -2022,23 +2493,56 @@ const document = {{
   body: {{ appendChild() {{}}, removeChild() {{}} }},
   execCommand() {{ return true; }}
 }};
-const context = {{ document, window: {{}}, navigator: {{}}, console }};
+let copiedKind = "";
+const copied = {{}};
+const navigator = {{
+  clipboard: {{
+    writeText(text) {{
+      copied[copiedKind] = text;
+      return Promise.resolve();
+    }}
+  }}
+}};
+const context = {{ document, window: {{ isSecureContext: true }}, navigator, console }};
 vm.runInNewContext(code, context);
-const input = JSON.parse(fs.readFileSync(0, "utf8"));
-const api = context.window.Contract2AgentPlayground;
-const diagnosis = api.analyzeDispute(input);
-const markdown = api.markdownReport(diagnosis);
-const metrics = api.computeEvaluationMetrics(input, diagnosis);
-const testCase = api.buildTestCasePreview(input, diagnosis, metrics);
-const jsonOutput = JSON.stringify(
-  {{
-    ...diagnosis,
-    structured_diagnosis_preview: api.structuredPreview(diagnosis)
-  }},
-  null,
-  2
-);
-process.stdout.write(JSON.stringify({{ diagnosis, markdown, json: jsonOutput, test_case: testCase }}));
+(async () => {{
+  const input = JSON.parse(fs.readFileSync(0, "utf8"));
+  const api = context.window.Contract2AgentPlayground;
+  const fieldIds = {{
+    contractType: "contract-type",
+    disputeType: "dispute-type",
+    outputFormat: "output-format",
+    diagnosisDepth: "diagnosis-depth",
+    riskMode: "risk-mode",
+    desiredOutcome: "desired-outcome",
+    contractText: "contract-text",
+    disputeDescription: "dispute-description",
+    claimantPosition: "claimant-position",
+    respondentPosition: "respondent-position",
+    evidence: "evidence",
+    metadata: "metadata"
+  }};
+  Object.entries(fieldIds).forEach(([key, id]) => {{
+    elements.get(id).value = input[key] || "";
+  }});
+  elements.get("diagnosis-form").listeners.submit({{ preventDefault() {{}} }});
+  copiedKind = "markdown";
+  await elements.get("copy-markdown").listeners.click();
+  copiedKind = "json";
+  await elements.get("copy-json").listeners.click();
+  copiedKind = "test-case";
+  await elements.get("copy-test-case").listeners.click();
+  const diagnosis = api.analyzeDispute(input);
+  process.stdout.write(JSON.stringify({{
+    diagnosis,
+    markdown: copied.markdown,
+    json: copied.json,
+    test_case: JSON.parse(copied["test-case"])
+  }}));
+}})().catch((error) => {{
+  console.error(error && error.stack ? error.stack : error);
+  process.exit(1);
+}});
 """
     completed = subprocess.run(
         [node, "-e", script],

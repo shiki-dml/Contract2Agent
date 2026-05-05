@@ -1,5 +1,193 @@
 # Contract2Agent Bug Audit
 
+## 2026-05-05 Clause Signal vs Active Issue Separation
+
+### Symptom
+
+Contract clauses could be promoted into active disputes. A clause-only family could then flow through the final diagnosis into `active_issue_tags`, `dispute_type`, key issues, risk rationale, suggested next steps, Markdown/JSON exports, and Evaluation Lab `expected_outputs.must_include_issues`.
+
+### Examples observed
+
+- Force majeure clause-only false positive: a Sales Contract force majeure clause plus facts denying force majeure notice, government order, natural disaster, port closure, strike, war, emergency closure, and extraordinary external event could still be at risk of activating force majeure through broad factual matching.
+- Invoice/payment false positive: invoice dates or invoice evidence, such as an alternative supplier invoice used to prove cover costs, could be treated as an invoice dispute even without an unpaid invoice, disputed invoice, billing dispute, or invoice nonpayment.
+- Other clause-only families covered by regressions: confidentiality, indemnity, and liquidated damages now remain clause signals unless factual fields show an actual disclosure, tender/third-party claim, or liquidated-damages demand/penalty dispute.
+
+### Root cause
+
+The active-trigger layer did not have one explicit gate separating contract clause text from factual issue activation. `factText` included the selected dispute type, some active trigger lists included clause-like terms such as `invoice date` or generic `liquidated damages`, and `deriveActiveIssueTags` had repeated ad hoc checks instead of a shared issue-family activation rule. This allowed clause context or evidence labels to look like active disputes.
+
+### Files inspected
+
+- `docs/assets/app.js`
+- `tests/test_docs_site.py`
+- `bug_audit.md`
+
+### Files changed
+
+- `docs/assets/app.js`
+- `tests/test_docs_site.py`
+- `bug_audit.md`
+
+### New helper/gate functions
+
+- `activeTriggerText(data)` defines the factual activation source: desired outcome, dispute description, claimant position, respondent position, evidence, and metadata. It excludes contract text and the selected dispute type label.
+- `shouldActivateIssueFamily(data, family, clauseSignals, activeTrigger, clausePhrases, options)` is the active issue gate used by `deriveActiveIssueTags`.
+
+### Active triggers vs clause triggers
+
+Clause triggers still come from `buildClauseSignals(data)` and may be detected from contract text alone. Active triggers now come from factual fields through `hasIssueFactTrigger` and family-specific helpers. A clause signal may support the analysis, but it does not by itself create an active issue tag.
+
+### Blocker triggers
+
+Blocker and negative terms remain in the issue-family registry and are evaluated against factual activation text. The force majeure registry now includes explicit blockers such as no force majeure notice, no government order, no natural disaster, no port closure, no strike, no war, no emergency closure, no extraordinary external event, and ordinary backlog/staffing-only facts. Confidentiality, indemnity, invoice dispute, and liquidated-damages blockers were tightened as well.
+
+### Exports and Evaluation Lab
+
+The prior final diagnosis source-of-truth path is preserved. Markdown, JSON, structured preview, risk rationale, suggested next steps, and Evaluation Lab preview still consume `finalDiagnosis`; because `active_issue_tags` is now filtered at the activation gate, clause-only families remain in `clause_signals` and do not appear in legacy `issue_tags` or Evaluation Lab `must_include_issues`.
+
+### Regression tests added
+
+- `test_playground_force_majeure_clause_only_stays_clause_signal`
+- `test_playground_positive_force_majeure_still_activates`
+- `test_playground_confidentiality_and_indemnity_clause_only_stay_clause_signals`
+- `test_playground_liquidated_damages_requires_active_remedy_or_dispute`
+- `test_playground_liability_limitation_active_when_damages_are_disputed`
+- `test_playground_alternative_supplier_invoice_is_not_invoice_dispute`
+- `test_playground_clause_active_separation_survives_sequential_runs`
+
+### Commands run
+
+| Command | Result | Summary |
+| --- | --- | --- |
+| `Test-Path package.json` | Passed | Returned `False`; no npm project is present, so `npm test`, `npm run build`, `npm run lint`, and `npm run typecheck` are not applicable. |
+| `node --check docs\assets\app.js` | Passed | Static playground JavaScript parses successfully. |
+| `python -m pytest tests\test_docs_site.py` | Passed | 47 passed in 4.41s on the final focused docs-site run. |
+| `python -m pytest` | Passed | 260 passed in 21.78s. |
+| `python -m compileall -q contract2agent tests scripts` | Passed | Python syntax compilation succeeded. |
+| `python scripts\check_docs_links.py` | Passed | Checked 26 Markdown files; all relative links resolve. |
+| `python -m mkdocs build --strict` | Passed | Documentation built successfully. |
+| `git diff --check` | Passed | No whitespace errors. |
+| `git status --short` | Passed | Only `bug_audit.md`, `docs/assets/app.js`, and `tests/test_docs_site.py` are modified. |
+
+### Results
+
+- Clause text alone no longer creates active issue tags in the covered families.
+- Force majeure positive facts still activate force majeure.
+- Confidentiality and indemnity clause-only facts remain clause signals only.
+- Liquidated damages activates when sought or contested, not from the clause alone.
+- Liability limitation activates when damages/cap recovery is actually disputed.
+- Alternative supplier invoice evidence does not activate invoice dispute or invoice-dispute timeline/gap templates.
+- Cross-run regression coverage verifies a positive force majeure run does not leak active force majeure templates into a later clause-only run.
+
+### Remaining follow-ups
+
+This patch focuses on the clause-signal/active-issue separation layer for the issue families covered by the requested examples. Deeper semantic tuning may still be needed for less-covered families such as termination, audit rights, complex payment allocation, sales acceptance, or issue-specific jurisdictional nuances.
+
+## 2026-05-05 Final Diagnosis Source-of-Truth Audit
+
+### Symptom
+
+Multiple playground output surfaces could diverge or reuse stale/pre-filtered diagnosis data. The risk display, suggested next steps, Markdown export, JSON export, structured preview, and Evaluation Lab preview all accepted diagnosis-shaped data, but there was no explicit final normalized diagnosis boundary that every output path was required to consume.
+
+### Root cause
+
+The static playground produced a diagnosis object after raw detection, but final filtering, compatibility aliases, risk rationale, next-step generation, export JSON assembly, and Evaluation Lab expected-output generation were not guarded by a single canonical normalization step. Several functions already consumed a passed diagnosis object, but they could still receive partially normalized fields or legacy aliases, and `render` assembled JSON inline instead of using a final-diagnosis export builder. `buildNextSteps` also preferred legacy camelCase aliases, which made it easier for stale or pre-final state to drive user-visible steps.
+
+### Field-generation audit
+
+| Field or surface | Canonical source after this patch |
+| --- | --- |
+| `contract_type` | `detectContractTypes` in `diagnose`, then normalized by `normalizeFinalDiagnosis`. |
+| `dispute_type` | `detectDisputeTypes` in `diagnose`, then normalized from `dispute_types` by `normalizeFinalDiagnosis`. |
+| `active_issue_tags` | `deriveActiveIssueTags` in `diagnose`, then deduplicated and filtered by `normalizeFinalDiagnosis`. |
+| `issue_tags` | Legacy compatibility field created by `normalizeFinalDiagnosis`; it mirrors `active_issue_tags`. |
+| `clause_signals` | `buildClauseSignals` in `diagnose`, then normalized by `normalizeFinalDiagnosis`. |
+| `key_issues` | `buildIssues` receives the preliminary normalized diagnosis fields and is normalized into the final diagnosis. |
+| `timeline_facts` | `extractTimelineFacts` in `diagnose`, then normalized by `normalizeFinalDiagnosis`. |
+| `evidence_gaps` | `buildEvidenceGaps` in `diagnose`, then normalized by `normalizeFinalDiagnosis`. |
+| Risk level | `scoreRisk` receives normalized active issues, evidence gaps, and timeline facts; `normalizeFinalDiagnosis` stores it in `risk.level`. |
+| Risk rationale | `scoreRisk` builds it from final active issues, evidence gaps, and timeline facts before final normalization. |
+| `critical_evidence_gaps` | `scoreRisk` produces them from normalized gaps, and `normalizeFinalDiagnosis` clones them under `risk`. |
+| `suggested_next_steps` | `buildNextSteps(data, finalDiagnosis)` runs after risk/key issue normalization and is stored back into `finalDiagnosis`. |
+| Structured diagnosis preview | `structuredPreview(finalDiagnosis)`. |
+| Markdown report preview/export | `markdownReport(finalDiagnosis)`. |
+| JSON-style output preview/export | `jsonReport(finalDiagnosis)`. |
+| Evaluation Lab generated test preview | `buildEvaluationPreview(input, finalDiagnosis)`, which calls `computeEvaluationMetrics` and `buildTestCasePreview`. |
+| Evaluation Lab `must_include_issues` | `buildTestCasePreview` copies from `finalDiagnosis.active_issue_tags`. |
+| Evaluation Lab `must_include_evidence_gaps` | `buildTestCasePreview` copies from `finalDiagnosis.evidence_gaps`. |
+| Evaluation Lab `risk_signal` | `buildTestCasePreview` copies from `finalDiagnosis.risk_signal`. |
+| Evaluation Lab `case_name` | `caseNameFor` normalizes its diagnosis input and derives the name from final active issue tags only. |
+
+### Files inspected
+
+- `docs/assets/app.js`
+- `tests/test_docs_site.py`
+- `bug_audit.md`
+
+### Files changed
+
+- `docs/assets/app.js`
+- `tests/test_docs_site.py`
+- `bug_audit.md`
+
+### How `finalDiagnosis` is produced
+
+`diagnose` now runs raw deterministic detection first, then creates `finalDiagnosis` through `normalizeFinalDiagnosis`. Key issues and risk are generated from that normalized object, the object is normalized again, suggested next steps are generated from `finalDiagnosis`, and a final normalization pass returns the canonical result. This keeps raw signals upstream and makes the returned diagnosis the source of truth for all user-visible and export-visible fields.
+
+### Output builders now consuming `finalDiagnosis`
+
+- `render`
+- `markdownReport`
+- `jsonReport`
+- `structuredPreview`
+- `computeEvaluationMetrics`
+- `buildTestCasePreview`
+- `buildEvaluationPreview`
+- `caseNameFor`
+
+### Legacy compatibility
+
+`normalizeFinalDiagnosis` preserves compatibility fields while making them canonical aliases. `issue_tags` is always a fresh clone of `active_issue_tags`, `relevant_clause_signals` mirrors `clause_signals`, `dispute_type` is derived from `dispute_types`, and `risk_signal` mirrors `risk.level`.
+
+### Fresh per-run state
+
+Every `diagnose` call creates a new `finalDiagnosis` object. `normalizeFinalDiagnosis` clones arrays and nested objects, removes empty strings, deduplicates values with stable ordering, and avoids mutating shared template/default arrays. Output builders normalize their input before rendering, so a caller cannot accidentally export a stale intermediate object.
+
+### Tests added or updated
+
+- Updated `_run_playground_diagnosis` to exercise the rendered copy/export path for Markdown, JSON, and Evaluation Lab generated test cases.
+- Added `test_playground_final_diagnosis_is_source_for_json_and_markdown_exports`.
+- Added `test_playground_evaluation_preview_uses_final_diagnosis`.
+- Added `test_playground_no_post_final_regeneration_of_active_issues`.
+- Added `test_playground_final_diagnosis_runs_have_fresh_state`.
+
+### Commands run
+
+| Command | Result | Summary |
+| --- | --- | --- |
+| `Test-Path package.json` | Passed | Returned `False`; no npm project is present, so `npm install`, `npm test`, `npm run build`, `npm run lint`, and `npm run typecheck` are not applicable. |
+| `node --check docs\assets\app.js` | Passed | Static playground JavaScript parses successfully. |
+| `python -m pytest tests\test_docs_site.py` | Passed | 40 passed in 3.82s on the final focused docs-site regression run. |
+| `python -m pytest` | Passed | 253 passed in 19.69s on the final full run. |
+| `python -m compileall -q contract2agent tests scripts` | Passed | Python syntax compilation succeeded. |
+| `python scripts\check_docs_links.py` | Passed | Checked 26 Markdown files; all relative links resolve. |
+| `python -m mkdocs build --strict` | Passed | Documentation built successfully after the final `docs/assets/app.js` and audit edits. |
+| `git diff --check` | Passed | No whitespace errors. |
+| `git status --short` | Passed | Only `bug_audit.md`, `docs/assets/app.js`, and `tests/test_docs_site.py` are modified. |
+
+### Results
+
+- The returned `finalDiagnosis` is now the single source used by UI preview, Markdown export, JSON export, risk display, suggested next steps, and Evaluation Lab preview.
+- JSON `issue_tags` mirrors `active_issue_tags` after final filtering.
+- Markdown and JSON active issues, key issues, timeline facts, evidence gaps, and suggested next steps match the final diagnosis object.
+- Evaluation Lab `expected_outputs.must_include_issues`, `must_include_evidence_gaps`, `risk_signal`, and case naming derive from the final diagnosis.
+- Sequential diagnosis runs are covered by a regression test that checks arrays and generated text do not inherit stale values from a prior fixture.
+
+### Remaining follow-ups
+
+- This patch centralizes the diagnosis source of truth. It intentionally does not fully redesign semantic issue-family trigger gates.
+- Force majeure, invoice dispute, lease, sales, SaaS/SLA, refund, indemnity, confidentiality, and IP trigger rules may still need separate semantic follow-up when a false positive or false negative comes from raw detection rather than post-final output construction.
+
 ## 2026-05-05 Playground Deterministic Diagnosis Bug Catalog and Verification
 
 ### Scope
