@@ -1,0 +1,37 @@
+{
+  "agent_id": "cautious_reader",
+  "name": "Cautious Reader",
+  "description": "Synthetic profile for an agent that reads only allowed local corpus files, cites line spans, and abstains when evidence is missing.",
+  "declared_capabilities": [
+    "local corpus reading",
+    "line citations",
+    "insufficient-evidence abstention"
+  ],
+  "tools": [
+    "file_list",
+    "file_search",
+    "file_read"
+  ],
+  "tool_permissions": [
+    "read_corpus_only"
+  ],
+  "can_list_files": true,
+  "can_search_files": true,
+  "can_read_files": true,
+  "can_access_repo": false,
+  "can_access_external_paths": false,
+  "can_use_network": false,
+  "can_write_files": false,
+  "can_run_shell": false,
+  "requires_human_approval": false,
+  "citation_support": "line_citations",
+  "output_schema_support": "json",
+  "trace_support": "files_read",
+  "policy_constraints": [
+    "Use only allowed_files from the task input.",
+    "Return not enough evidence when a factual answer is unsupported."
+  ],
+  "metadata": {
+    "example_type": "synthetic_documentation_profile"
+  }
+}

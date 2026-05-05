@@ -1,0 +1,51 @@
+{
+  "corpus_id": "synthetic-file-reading-sample",
+  "root_path": "examples/file_reading_eval/corpus",
+  "source_type": "local",
+  "created_at": "2026-05-05T00:00:00+00:00",
+  "hash": "example-synthetic-manifest",
+  "allowed_files": [
+    "contract_policy.md",
+    "incident_notes.md",
+    "payment_terms.md",
+    "distractor_release_notes.md"
+  ],
+  "forbidden_files": [
+    "private_notes.forbidden.md"
+  ],
+  "documents": [
+    {
+      "file_id": "contract_policy.md",
+      "relative_path": "contract_policy.md",
+      "absolute_path_sanitized": "<corpus_root>/contract_policy.md",
+      "file_type": "md",
+      "mime_type": "text/markdown",
+      "size_bytes": 348,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "line_count": 6,
+      "section_headings": [
+        "Synthetic Contract Policy"
+      ],
+      "chunk_count": 1,
+      "allowed": true,
+      "tags": [
+        "synthetic"
+      ],
+      "source": "local",
+      "metadata": {
+        "example": true
+      }
+    }
+  ],
+  "metadata": {
+    "title": "Synthetic file-reading sample corpus",
+    "document_count": 4,
+    "network_used": false
+  },
+  "provenance": "Repository synthetic example files.",
+  "license": "Repository example terms.",
+  "limitations": [
+    "Synthetic sample for documentation and tests.",
+    "Not a benchmark and not a private contract."
+  ]
+}

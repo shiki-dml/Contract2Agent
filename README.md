@@ -129,7 +129,7 @@ c2a file-eval import-local --input ./docs --out .runs/file-corpus --manifest .ru
 c2a file-eval build-tasks --corpus .runs/file-corpus/manifest.json --mode smoke --max-tasks 20 --out .runs/file-tasks.jsonl
 c2a file-eval run \
   --profile examples/agent_eval/file_reading_agent_profile.json \
-  --agent-command "python my_agent_adapter.py {input_json} {output_json}" \
+  --agent-command "python <absolute/path/to/my_agent_adapter.py> {input_json} {output_json}" \
   --corpus .runs/file-corpus/manifest.json \
   --tasks .runs/file-tasks.jsonl \
   --time-budget-seconds 300 \
@@ -138,6 +138,8 @@ c2a file-eval run \
 c2a file-eval grade --run .runs/file-reading-run --tasks .runs/file-tasks.jsonl --out .runs/file-reading-run/grades.json
 c2a file-eval report --run .runs/file-reading-run --format md,json --out .runs/file-reading-report
 ```
+
+Use an absolute adapter path for `--agent-command`; target commands run with the run directory as their current working directory.
 
 `profile-only` reports are readiness/risk reports only and explicitly state: "No observed performance score because no agent run was executed." Observed scores require `file-eval run` artifacts.
 
@@ -149,7 +151,14 @@ Optional semantic judging is available only when explicitly requested with comma
 
 LLM judge runs are budgeted and compact by design: `--judge-only`, `--max-judge-tasks`, `--llm-max-input-chars`, `--llm-max-output-tokens`, `--evidence-snippet-limit`, `--cost-budget-usd`, `--dry-run-cost-estimate`, and judge caching control how many tasks are sent and how much context is included. Judge inputs include task/output/evidence summaries, not full corpora or forbidden files. Reports keep deterministic scores separate from optional non-deterministic judge scores and group recommendations by priority.
 
-Dedicated guide: [docs/file-reading-eval/README.md](docs/file-reading-eval/README.md). Runnable examples: [examples/file_reading_eval/README.md](examples/file_reading_eval/README.md).
+Detailed file-reading docs:
+
+- [Overview](docs/file-reading-eval/README.md)
+- [CLI guide](docs/file-reading-eval/cli-guide.md)
+- [Sample run walkthrough](docs/file-reading-eval/sample-run.md)
+- [Report examples and scoring guide](docs/file-reading-eval/report-examples.md)
+
+Runnable examples: [examples/file_reading_eval/README.md](examples/file_reading_eval/README.md).
 
 ## CLI Usage
 

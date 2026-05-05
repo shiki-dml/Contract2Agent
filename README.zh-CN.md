@@ -141,7 +141,7 @@ c2a eval-agent \
   --out reports/agent_eval.md
 ```
 
-File-reading specialized adapter CLI:
+文件阅读专用适配器 CLI：
 
 ```bash
 c2a file-eval --help
@@ -149,7 +149,7 @@ c2a file-eval import-local --input ./docs --out .runs/file-corpus --manifest .ru
 c2a file-eval build-tasks --corpus .runs/file-corpus/manifest.json --mode smoke --max-tasks 20 --out .runs/file-tasks.jsonl
 c2a file-eval run \
   --profile examples/agent_eval/file_reading_agent_profile.json \
-  --agent-command "python my_agent_adapter.py {input_json} {output_json}" \
+  --agent-command "python <absolute/path/to/my_agent_adapter.py> {input_json} {output_json}" \
   --corpus .runs/file-corpus/manifest.json \
   --tasks .runs/file-tasks.jsonl \
   --time-budget-seconds 300 \
@@ -159,11 +159,23 @@ c2a file-eval grade --run .runs/file-reading-run --tasks .runs/file-tasks.jsonl 
 c2a file-eval report --run .runs/file-reading-run --format md,json --out .runs/file-reading-report
 ```
 
-The `file_reading_agent` adapter runs local CLI evaluations over approved corpora. It imports local files or user-provided papers, builds or loads JSONL tasks, runs a target agent with `{input_json}` and `{output_json}` placeholders, captures stdout/stderr and traces, grades observed outputs, and writes Markdown/JSON reports with recommendations.
+`--agent-command` 请使用绝对适配器路径；目标命令会以 run directory 作为当前工作目录运行。
 
-Profile-only mode is readiness/risk analysis only and states: "No observed performance score because no agent run was executed." Observed file-reading scores require an actual `file-eval run`.
+`file_reading_agent` 适配器在批准的语料上运行本地 CLI 评估。它可以导入本地文件或用户提供的论文，构建或加载 JSONL 任务，通过 `{input_json}` 和 `{output_json}` 占位符运行目标智能体，捕获 stdout/stderr 和 trace，对观测输出评分，并写出带建议的 Markdown / JSON 报告。
 
-Reference metadata for OpenAI eval methodology, QASPER, SQuAD, HotpotQA, DocVQA, and LongBench is contextual. Benchmark or paper references do not become direct scores unless comparable observed results are imported. Network import is disabled by default and requires `--allow-network`.
+`profile-only` 模式只是准备度/风险分析，并会明确说明："No observed performance score because no agent run was executed." 文件阅读性能分数必须来自实际 `file-eval run`。
+
+OpenAI eval methodology、QASPER、SQuAD、HotpotQA、DocVQA 和 LongBench 等参考元数据只是上下文。除非导入了兼容的观测结果，否则 benchmark 或论文参考不会变成直接分数。网络导入默认禁用，并要求显式 `--allow-network`。
+
+详细文件阅读文档：
+
+- [概览](docs/file-reading-eval/README.zh-CN.md)
+- [CLI 指南](docs/file-reading-eval/cli-guide.zh-CN.md)
+- [样例运行 walkthrough](docs/file-reading-eval/sample-run.zh-CN.md)
+- [报告示例与评分说明](docs/file-reading-eval/report-examples.zh-CN.md)
+- [英文概览](docs/file-reading-eval/README.md)
+
+可运行样例：[examples/file_reading_eval/README.md](examples/file_reading_eval/README.md)。
 
 包身份：
 

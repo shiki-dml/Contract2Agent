@@ -29,7 +29,13 @@ nav:
   - Core Features:
       - File Reading Eval:
           - Overview: file-reading-eval/README.md
+          - CLI Guide: file-reading-eval/cli-guide.md
+          - Sample Run: file-reading-eval/sample-run.md
+          - Report Examples: file-reading-eval/report-examples.md
           - zh-CN: file-reading-eval/README.zh-CN.md
+          - zh-CN CLI Guide: file-reading-eval/cli-guide.zh-CN.md
+          - zh-CN Sample Run: file-reading-eval/sample-run.zh-CN.md
+          - zh-CN Report Examples: file-reading-eval/report-examples.zh-CN.md
       - Failure Taxonomy: failure-taxonomy.md
       - Baselines: baselines.md
       - Patch Preview: patch-preview.md

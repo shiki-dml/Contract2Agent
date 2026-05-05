@@ -1,0 +1,25 @@
+{
+  "reference_results": [
+    {
+      "reference_result_id": "synthetic_same_task_reader_reference",
+      "source_id": "local_synthetic_file_reading_examples",
+      "agent_or_model": "example_cautious_reader",
+      "agent_config_summary": "Synthetic documentation profile over the committed sample task set.",
+      "task_pack_id": "sample_tasks",
+      "metrics": {
+        "overall_score": 0.86,
+        "answer_correctness": 0.9,
+        "citation_quality": 0.82
+      },
+      "environment": "documented local CLI sample",
+      "scoring_method": "contract2agent_file_reading_v1",
+      "comparable_conditions": true,
+      "source_url": "",
+      "citation": "Synthetic repository example; not a public benchmark result.",
+      "limitations": [
+        "Tiny synthetic example for report-shape documentation.",
+        "Use the same corpus and tasks before treating deltas as same-task comparison."
+      ]
+    }
+  ]
+}

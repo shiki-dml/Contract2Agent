@@ -1,0 +1,10 @@
+{
+  "task_id": "sample_refund_notice_period",
+  "answer": "Approved refunds require a written service-impact notice within 7 calendar days.",
+  "citations": [],
+  "confidence": 0.88,
+  "files_read": [
+    "contract_policy.md"
+  ],
+  "notes": "Synthetic sample output with a correct answer but no structured citation."
+}

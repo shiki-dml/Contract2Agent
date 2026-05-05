@@ -1,142 +1,108 @@
 # File-Reading Agent Evaluation
 
-## Overview
+Contract2Agent includes a specialized `file_reading_agent` adapter for observed local evaluation. It is for agents that read a bounded corpus, select evidence, answer questions, cite source lines, abstain when evidence is missing, and respect forbidden-file boundaries.
 
-Contract2Agent includes a specialized `file_reading_agent` subsystem for observed local evaluation. It imports approved corpora, loads or builds tasks, runs a target agent through a command adapter, captures artifacts, grades deterministic dimensions, optionally adds an LLM judge, compares compatible reference results, and renders Markdown/JSON reports.
+This adapter is evaluation-first. A profile-only report can describe readiness and risk, but observed performance scores require a real `file-eval run` artifact.
 
-## Why Observed Evaluation Matters
+## What It Does
 
-File-reading claims are not performance evidence. A profile-only report can describe readiness, risk, and an eval plan, but actual reading performance requires observed outputs, citations, traces, and grading artifacts.
+- Imports approved local text-like files into a corpus manifest.
+- Loads or builds JSONL tasks with gold answers and evidence spans.
+- Runs a target agent through a black-box JSON command adapter.
+- Captures target outputs, traces, stdout, stderr, timing, and files read.
+- Grades deterministic dimensions such as answer correctness, citations, file selection, abstention, schema compliance, and forbidden-file safety.
+- Optionally runs an explicit LLM or command-based judge after deterministic grading.
+- Compares against compatible observed reference results, while keeping public benchmark references contextual.
+- Renders Markdown and JSON reports with evidence basis, failures, recommendations, limitations, and artifact labels.
 
-## Deterministic vs LLM-Judged Evaluation
+## What It Does Not Do
 
-Deterministic grading is the default and requires no API. It scores answer correctness, citation presence, quote match, line span accuracy, file selection, forbidden-file safety, abstention, schema compliance, latency, and unsupported-claim proxies.
+- It does not score file-reading performance from declared capabilities alone.
+- It does not make API calls in deterministic mode.
+- It does not make GitHub Pages run live evaluations.
+- It does not read private files outside the configured corpus.
+- It does not treat papers, benchmark descriptions, or imported methodology notes as target-agent scores.
+- It does not implement network dataset pulling in the default dependency-free path.
 
-LLM judging is optional, explicit, non-deterministic, and supplementary. It can help with semantic equivalence, summary faithfulness, contradiction detection, evidence support, and recommendation synthesis. It does not replace deterministic checks for citations, forbidden files, schema, paths, hashes, or timeouts.
+## Documentation Map
 
-## Installation And Setup
+- [CLI user guide](cli-guide.md)
+- [Sample run walkthrough](sample-run.md)
+- [Report examples and scoring guide](report-examples.md)
+- [中文概览](README.zh-CN.md)
+- [中文 CLI 指南](cli-guide.zh-CN.md)
+- [中文样例运行](sample-run.zh-CN.md)
+- [中文报告示例](report-examples.zh-CN.md)
+
+Repository examples:
+
+- `examples/file_reading_eval/README.md`
+- `examples/file_reading_eval/tasks/sample_tasks.jsonl`
+- `examples/file_reading_eval/target_outputs/good_output.json`
+- `examples/file_reading_eval/expected_reports/deterministic_report.example.md`
+- `examples/file_reading_eval/expected_reports/deterministic_report.example.json`
+
+## Minimum Workflow
+
+Install from a fresh clone:
 
 ```bash
 python -m pip install -e ".[dev]"
-c2a file-eval doctor
-c2a file-eval help workflow
 ```
 
-## Quick Start
+Use the module entry point first because it works before console scripts are on `PATH`:
 
 ```bash
-c2a file-eval import-local --input examples/file_reading_eval/corpus --out .runs/file-corpus --manifest .runs/file-corpus/manifest.json
-c2a file-eval validate --corpus .runs/file-corpus/manifest.json --tasks examples/file_reading_eval/tasks/smoke_tasks.jsonl
-c2a file-eval run --profile examples/file_reading_eval/profiles/good_file_reader.json --agent-command "python examples/file_reading_eval/agents/dummy_good_reader.py {input_json} {output_json}" --corpus .runs/file-corpus/manifest.json --tasks examples/file_reading_eval/tasks/smoke_tasks.jsonl --out .runs/file-run
-c2a file-eval grade --run .runs/file-run --tasks examples/file_reading_eval/tasks/smoke_tasks.jsonl --out .runs/file-run/grades.json
-c2a file-eval report --run .runs/file-run --format md,json --out .runs/file-report
+python -m contract2agent.cli --help
+python -m contract2agent.cli file-eval --help
+python -m contract2agent.cli file-eval doctor --plain
+python -m contract2agent.cli file-eval help llm
 ```
 
-## CLI Command Reference
-
-- `init`: create a starter workspace layout.
-- `import-local`: import local text files or papers with provenance metadata.
-- `build-tasks`: generate deterministic smoke tasks.
-- `validate`: check task IDs, file references, evidence, and answerability metadata.
-- `run`: execute a target agent command with `{input_json}` and `{output_json}` placeholders.
-- `grade`: compute deterministic grades and scorecards.
-- `judge`: run optional semantic judging after deterministic grading.
-- `compare`: compare against compatible reference results.
-- `report`: render Markdown/JSON reports.
-- `doctor`: print environment and safety checks.
-
-## Help Commands
+After installation, the `c2a` console script should also be available:
 
 ```bash
+c2a --help
 c2a file-eval --help
-c2a file-eval help
-c2a file-eval help workflow
-c2a file-eval help deterministic
-c2a file-eval help llm
-c2a file-eval help scoring
-c2a file-eval help examples
-c2a file-eval help references
 ```
 
-## Corpus Import
+## Core Concepts
 
-`import-local` copies supported text-like files into a corpus directory and writes a manifest. Secret-like paths, `.env`, cache directories, virtual environments, and unsupported files are skipped. Network imports are disabled unless a command explicitly supports and receives `--allow-network`.
+- Agent profile: JSON metadata describing tools, permissions, citation support, trace support, and safety constraints.
+- Corpus: approved local files copied into a manifest-bounded evaluation corpus.
+- Eval task: one JSONL record with a question, allowed files, forbidden files, gold answer, and expected evidence spans.
+- Gold answer: expected answer text or accepted aliases.
+- Gold evidence spans: machine-checkable `file_id`, line range, quote, label, and required flag.
+- Target output: target-agent JSON with `answer`, `citations`, optional `confidence`, `files_read`, and `notes`.
+- Citation validation: deterministic checks for known file IDs, line range overlap, and exact quote match.
+- Deterministic grader: default local scorer; no API key required.
+- Optional LLM judge: explicit supplementary semantic judge; non-deterministic and separate from deterministic scores.
+- Report JSON and Markdown report: generated artifacts that explain scores, evidence, failure modes, and limitations.
+- Run directory: ignored local output directory, usually under `.runs/`.
 
-## Task Files
+## Safety Model
 
-Tasks are JSONL records with `task_id`, `task_type`, `question`, allowed/forbidden files, supporting files, gold answers, evidence spans, and unanswerable flags. Keep tasks general and avoid exact fixture-name logic.
+`import-local` skips common secret, cache, virtual environment, browser data, `.git`, `.env`, and credential-like paths. Generated reports sanitize local absolute paths and redact sensitive-looking values where report redaction is implemented.
 
-## Running A Target Agent
+The runner sends only task-scoped inputs to the target command. The target command is responsible for obeying `allowed_files` and `forbidden_files`; the grader detects reported forbidden-file reads through output and trace artifacts.
 
-The runner sends JSON containing the task, corpus directory, manifest path, allowed files, forbidden files, instructions, and required output schema. The target agent returns JSON with `answer`, `citations`, `confidence`, `files_read`, and optional notes.
+Reference papers, public methodology files, CSV metadata, and benchmark summaries are treated as user-provided or contextual evidence. They are not trusted target-agent performance results unless they are curated into tasks and linked to an observed run with compatible metrics.
 
-## Grading
+## Current Reference Import Support
 
-Deterministic graders run first. They produce per-task grades and a scorecard by dimension. Reports keep deterministic scores separate from optional judge results.
+Implemented:
 
-## Optional LLM Judge
+- `import-local --source-type paper|reference|methodology` records local provenance, license, and limitations metadata.
+- `list-references` prints curated contextual source metadata.
+- `import-reference --allow-network` records curated metadata for a known reference source, but the dependency-free adapter does not download dataset examples.
+- `compare` checks compatibility before computing metric deltas from observed reference results.
 
-Use an LLM judge only when requested:
+Planned:
 
-```bash
-c2a file-eval judge --run .runs/file-run --provider openai --judge-only failed --max-judge-tasks 5 --cost-budget-usd 1.00
-```
+- Rich local paper ingestion beyond text/Markdown conversion.
+- Full reference pack ingestion with licenses, provenance, and reproducible task construction.
+- More comparison labels beyond same-task compatibility checks.
 
-For local/custom judges:
+## Static Demo Constraint
 
-```bash
-c2a file-eval judge --run .runs/file-run --provider command --judge-command "python examples/file_reading_eval/agents/dummy_command_judge.py {input_json} {output_json}"
-```
-
-## API Key Handling
-
-The OpenAI-compatible provider reads `OPENAI_API_KEY` by default. If no key is set and the terminal is interactive, `--prompt-for-key` uses hidden session-only input. Keys are never written to reports, logs, cache, browser code, or committed config files.
-
-## Token And Cost Controls
-
-Use:
-
-- `--judge-only failed|uncertain|open-ended|all`
-- `--max-judge-tasks N`
-- `--llm-max-input-chars N`
-- `--llm-max-output-tokens N`
-- `--evidence-snippet-limit N`
-- `--cost-budget-usd N`
-- `--dry-run-cost-estimate`
-- `--cache-judge-results` or `--no-judge-cache`
-
-Judge inputs include compact question, answer, citations, cited snippets, gold answer/evidence, deterministic grade summary, failure modes, and instructions. They do not include the full corpus or forbidden files.
-
-## Reference Comparison
-
-Reference results are comparable only when task pack, scoring method, environment, and conditions match. Otherwise they remain contextual evidence and do not produce direct score deltas.
-
-## Report Interpretation
-
-Reports show observed task counts, deterministic score tables, citation quality, file selection, forbidden-file safety, abstention behavior, timeouts, reference compatibility, optional LLM judge status, recommendations, limitations, and trace artifact paths.
-
-## Recommendations
-
-Recommendations are generated from deterministic failure modes first and grouped by priority: critical, high, medium, and low. Optional LLM recommendations can supplement them when judging is enabled, but they are marked as judge-based supplements.
-
-## Examples
-
-See `examples/file_reading_eval/` in the repository for deterministic runs, profile-only mode, LLM judge dry-runs, command-based judges, forbidden-file failures, citation mismatches, unanswerable questions, reference comparison, and report generation.
-
-## Security And Path Boundaries
-
-Do not import secrets or private user files. The importer skips common secret/cache paths. Judge input sanitizes local paths and excludes forbidden files. GitHub Pages remains static and must not call APIs or run arbitrary agent experiments.
-
-## Limitations
-
-- Baseline grading is deterministic but not a full human semantic review.
-- LLM judge results are non-deterministic and provider-dependent.
-- Public benchmark references are contextual unless comparable observed results exist.
-- PDF extraction and network dataset import are intentionally not part of the default dependency-free path.
-
-## Roadmap
-
-- More curated task generators.
-- Stronger reference-result compatibility metadata.
-- Additional local judge adapters.
-- More corpus formats behind explicit optional extras.
+GitHub Pages remains a static viewer and demo. File-reading evaluations should run through the CLI, local scripts, or CI-generated artifacts, not in the browser.

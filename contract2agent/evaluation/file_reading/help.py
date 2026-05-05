@@ -59,9 +59,11 @@ It is authoritative for:
 Baseline command sequence:
 c2a file-eval import-local --input ./files --out .runs/corpus --manifest .runs/corpus/manifest.json
 c2a file-eval build-tasks --corpus .runs/corpus/manifest.json --out .runs/tasks.jsonl
-c2a file-eval run --profile profile.json --agent-command "python adapter.py {input_json} {output_json}" --corpus .runs/corpus/manifest.json --tasks .runs/tasks.jsonl --out .runs/run
+c2a file-eval run --profile profile.json --agent-command "python /absolute/path/to/adapter.py {input_json} {output_json}" --corpus .runs/corpus/manifest.json --tasks .runs/tasks.jsonl --out .runs/run
 c2a file-eval grade --run .runs/run --tasks .runs/tasks.jsonl --out .runs/run/grades.json
 c2a file-eval report --run .runs/run --out .runs/report
+
+Use an absolute adapter path for --agent-command because target commands run from the run directory.
 """,
     "llm": """Optional LLM judge
 
@@ -130,9 +132,12 @@ Profile-only readiness:
 c2a file-eval profile-only --profile examples/file_reading_eval/profiles/good_file_reader.json --out .runs/profile-readiness
 
 Deterministic run:
+Set an absolute adapter path first because target commands run from the run directory.
+PowerShell: $C2A_READER=(Resolve-Path examples/file_reading_eval/agents/dummy_good_reader.py).Path
+Bash: C2A_READER="$PWD/examples/file_reading_eval/agents/dummy_good_reader.py"
 c2a file-eval import-local --input examples/file_reading_eval/corpus --out .runs/example-corpus --manifest .runs/example-corpus/manifest.json
 c2a file-eval validate --corpus .runs/example-corpus/manifest.json --tasks examples/file_reading_eval/tasks/smoke_tasks.jsonl
-c2a file-eval run --profile examples/file_reading_eval/profiles/good_file_reader.json --agent-command "python examples/file_reading_eval/agents/dummy_good_reader.py {input_json} {output_json}" --corpus .runs/example-corpus/manifest.json --tasks examples/file_reading_eval/tasks/smoke_tasks.jsonl --out .runs/good-reader
+c2a file-eval run --profile examples/file_reading_eval/profiles/good_file_reader.json --agent-command "python $C2A_READER {input_json} {output_json}" --corpus .runs/example-corpus/manifest.json --tasks examples/file_reading_eval/tasks/smoke_tasks.jsonl --out .runs/good-reader
 c2a file-eval grade --run .runs/good-reader --tasks examples/file_reading_eval/tasks/smoke_tasks.jsonl --out .runs/good-reader/grades.json
 
 LLM judge dry-run:

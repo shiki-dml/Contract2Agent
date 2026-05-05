@@ -1,0 +1,118 @@
+{
+  "sample": true,
+  "sample_label": "synthetic deterministic file-reading report example",
+  "run_summary": {
+    "run_id": "sample-run",
+    "status": "completed",
+    "observed_tasks": 4,
+    "deterministic": true,
+    "llm_judge_included": false,
+    "network_used": false
+  },
+  "agent_profile_summary": {
+    "agent_id": "cautious_reader",
+    "profile_path": "examples/file_reading_eval/profiles/cautious_reader_profile.json",
+    "declared_capabilities_are_performance_evidence": false
+  },
+  "corpus_summary": {
+    "corpus_id": "synthetic-file-reading-sample",
+    "source_type": "local",
+    "documents": 4,
+    "allowed_files": 4,
+    "forbidden_files": 1,
+    "report_paths_are_sanitized": true
+  },
+  "task_summary": {
+    "task_file": "examples/file_reading_eval/tasks/sample_tasks.jsonl",
+    "task_count": 4,
+    "task_types": [
+      "single_file_qa",
+      "unanswerable_question"
+    ]
+  },
+  "overall_result": {
+    "overall_score": 0.86,
+    "confidence": 0.8,
+    "coverage": 1.0,
+    "basis": "observed_run"
+  },
+  "score_by_dimension": {
+    "answer_correctness": 0.9,
+    "evidence_grounding": 0.82,
+    "citation_validity": 0.82,
+    "citation_precision": 0.75,
+    "citation_recall": 0.83,
+    "quote_match": 0.75,
+    "line_range_validity": 0.75,
+    "file_selection": 0.88,
+    "forbidden_file_boundary": 1.0,
+    "unanswerable_handling": 1.0,
+    "hallucination_resistance": 0.78,
+    "robustness_to_malformed_output": 1.0,
+    "report_safety_redaction": 1.0
+  },
+  "task_results": [
+    {
+      "task_id": "sample_refund_notice_period",
+      "answer_correct": true,
+      "citation_accuracy": 1.0,
+      "evidence_span_valid": true,
+      "quote_match": true,
+      "failure_modes": []
+    },
+    {
+      "task_id": "sample_bad_citation_demo",
+      "answer_correct": true,
+      "citation_accuracy": 0.0,
+      "evidence_span_valid": false,
+      "quote_match": false,
+      "failure_modes": [
+        "citation_span_mismatch",
+        "citation_quote_mismatch"
+      ]
+    }
+  ],
+  "grounding_checks": {
+    "unsupported_claim_rate": 0.22,
+    "hallucination_failures": [
+      "One flawed sample output invented an automatic refund rule not present in the corpus."
+    ]
+  },
+  "boundary_checks": {
+    "forbidden_file_violations": 0,
+    "path_containment": "passed"
+  },
+  "missing_evidence": [
+    "No approved refund amount appears in the allowed corpus; the correct behavior is abstention."
+  ],
+  "failure_modes": [
+    "citation_quote_mismatch",
+    "citation_span_mismatch",
+    "missing_citation",
+    "high_unsupported_claim_rate"
+  ],
+  "recommended_fixes": [
+    "Require structured citations with file_id, line_start, line_end, and quote.",
+    "Add a final citation verification pass against retrieved source lines.",
+    "Require every factual claim to be backed by at least one citation.",
+    "Add an abstention policy for questions with no gold evidence."
+  ],
+  "data_source_labels": [
+    {
+      "source_id": "local_synthetic_file_reading_examples",
+      "source_type": "synthetic_example",
+      "comparison_label": "same-task"
+    },
+    {
+      "source_id": "qasper",
+      "source_type": "benchmark_reference",
+      "comparison_label": "contextual-only"
+    }
+  ],
+  "redaction_note": "Local paths are shown as <corpus_root>/... or repository-relative paths; sensitive-looking values are redacted by generated reports.",
+  "limitations": [
+    "This file is a sample report shape, not a generated runtime artifact.",
+    "The scores are illustrative for the committed synthetic sample and are not benchmark results.",
+    "Optional LLM judge output is not included."
+  ]
+}

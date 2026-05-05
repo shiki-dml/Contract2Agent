@@ -1,5 +1,246 @@
 # Contract2Agent Bug Audit
 
+## File-Reading Eval Bug and Harness Audit
+
+### Scope
+
+Focused post-change correctness audit for recent file-reading evaluation docs, CLI guide, sample walkthrough, report examples, safety cleanup, and generalized evaluation consistency. Scope was limited to `contract2agent/evaluation/`, `contract2agent/evaluation/file_reading/`, `contract2agent/cli.py`, file-reading tests, relevant docs/examples, README link correctness, `.gitignore`, and audit notes.
+
+### Skills Used
+
+- `pr-reviewer`: used first for review posture, checklist, and risk-oriented inspection.
+- `smart-patcher`: used for the confirmed minimal docs/help mismatch fix.
+- `unit-test-starter`: used for a focused regression test after the docs/help bug was confirmed.
+- `simple-refactor`: inspected but no harness extraction was made.
+
+### Files Inspected
+
+- `AGENTS.md`
+- `README.md`
+- `README.zh-CN.md`
+- `.gitignore`
+- `contract2agent/cli.py`
+- `contract2agent/evaluation/file_reading/cli.py`
+- `contract2agent/evaluation/file_reading/help.py`
+- `contract2agent/evaluation/file_reading/runner.py`
+- `contract2agent/evaluation/file_reading/tasks.py`
+- `contract2agent/evaluation/file_reading/graders.py`
+- `contract2agent/evaluation/file_reading/reports.py`
+- `contract2agent/evaluation/file_reading/llm_judge.py`
+- `docs/file-reading-eval/`
+- `examples/file_reading_eval/`
+- `tests/test_file_reading_eval.py`
+- `tests/test_file_reading_llm_judge.py`
+- `tests/test_file_reading_docs_examples.py`
+
+### Bugs/Conflicts Found
+
+#### Bug ID: FRA-BUG-2026-05-05-001
+
+- Area: file-reading docs, CLI help, sample walkthrough.
+- Severity: medium.
+- Symptom: documented `--agent-command "python examples/file_reading_eval/agents/..."` commands used repository-relative adapter paths, but `run_file_reading_eval()` executes target commands with `cwd=out_dir`. Those commands can therefore fail from `.runs/...` even though the docs present them as runnable walkthrough commands.
+- Root cause: documentation and CLI help did not account for the runner's run-directory current working directory.
+- Files inspected: `contract2agent/evaluation/file_reading/runner.py`, `contract2agent/evaluation/file_reading/help.py`, `docs/file-reading-eval/*.md`, `examples/file_reading_eval/README.md`, `README.md`, `README.zh-CN.md`, `tests/test_file_reading_docs_examples.py`.
+
+### Production Fixes Made
+
+- No file-reading evaluator scoring, runner, schema, redaction, judge, or generalized evaluation production behavior was changed.
+- CLI help text in `contract2agent/evaluation/file_reading/help.py` was corrected to tell users to provide an absolute adapter path.
+
+### Test Harness Changes
+
+- No new harness was added.
+- Rationale: the confirmed issue was a narrow docs/help contradiction, and existing file-reading tests plus the focused docs/example test file were clear enough. A shared harness would have added indirection without reducing a repeated setup problem in the audited patch.
+
+### Regression Tests Added/Updated
+
+- Updated `tests/test_file_reading_docs_examples.py` with `test_documented_agent_commands_use_absolute_adapter_path_guidance`.
+- The regression checks docs and `file-eval help` topics so repository-relative sample agent commands are not reintroduced.
+
+### Docs/Example Fixes
+
+- Updated `README.md` and `README.zh-CN.md` generic file-reading examples to use `<absolute/path/to/my_agent_adapter.py>`.
+- Updated English and zh-CN CLI/sample-run docs to instruct users to set an absolute adapter path before `file-eval run`.
+- Updated `examples/file_reading_eval/README.md` with the same guidance.
+- Updated `contract2agent/evaluation/file_reading/help.py` examples and deterministic help.
+
+### Safety Checks
+
+- No backend, network pull, browser eval, production dependency, or financial action path was added.
+- No `.runs/`, `.judge_cache/`, generated `file_reading_eval/`, cache, or pycache artifacts were added by this patch.
+- No benchmark/reference source was changed into a direct score without observed results.
+- Existing redaction and validation behavior was not weakened.
+
+### Commands Run And Results
+
+- `python -m pytest tests\test_file_reading_docs_examples.py` - 12 passed.
+- `python -m pytest tests\test_file_reading_eval.py` - 26 passed.
+- `python -m pytest tests\test_file_reading_llm_judge.py` - 21 passed.
+- `python -m pytest tests\test_agent_evaluation_framework.py` - 21 passed.
+- `python -m pytest` - 355 passed.
+- `python -m compileall -q contract2agent tests scripts` - passed.
+- `python scripts\check_docs_links.py` - checked 46 Markdown files; all relative links resolve.
+- `python -m mkdocs build --strict` - passed.
+- `node --check docs\assets\agent-eval.js` - passed.
+- `node --check docs\assets\app.js` - passed.
+- `python -m contract2agent.cli --help` - passed.
+- `python -m contract2agent.cli file-eval --help` - passed.
+- `python -m contract2agent.cli file-eval help llm` - passed.
+- `python -m contract2agent.cli file-eval doctor --plain` - passed.
+- `c2a --help` - not available on PATH in this shell; module CLI entrypoint passed and docs state `c2a` requires package installation/PATH.
+- `git diff --check` - passed.
+- `git status --short` - showed only recent docs/examples/tests/help/audit changes plus unrelated untracked local skill directories.
+- Local docs/examples safety scan for Windows paths, `/Users|/home|/tmp|/var` paths, `sk-...` keys, and `api_key|token|password|secret` assignments - passed with no hits.
+
+### No-Change Areas
+
+- No production scorer, task parser, evidence span validator, report renderer, LLM judge behavior, generalized framework logic, GitHub Pages JavaScript, or `.gitignore` behavior was changed.
+- No test harness was added.
+
+### Remaining Follow-Ups
+
+- `c2a` may remain unavailable on PATH in this shell; module entrypoint verification is the authoritative local check.
+
+## File-Reading Eval User Guide and Sample Report Pass
+
+### Goal
+
+Add high-quality file-reading evaluation documentation, report examples, CLI user guide, and a reproducible sample run walkthrough without redesigning the file-reading evaluation framework.
+
+### Files Inspected
+
+- `README.md`
+- `README.zh-CN.md`
+- `AGENTS.md`
+- `bug_audit.md`
+- `pyproject.toml`
+- `mkdocs.yml`
+- `.gitignore`
+- `contract2agent/cli.py`
+- `contract2agent/evaluation/file_reading/cli.py`
+- `contract2agent/evaluation/file_reading/help.py`
+- `contract2agent/evaluation/file_reading/schema.py`
+- `contract2agent/evaluation/file_reading/corpus.py`
+- `contract2agent/evaluation/file_reading/tasks.py`
+- `contract2agent/evaluation/file_reading/graders.py`
+- `contract2agent/evaluation/file_reading/reports.py`
+- `contract2agent/evaluation/file_reading/references.py`
+- `contract2agent/evaluation/file_reading/compare.py`
+- `tests/test_file_reading_eval.py`
+- `tests/test_file_reading_llm_judge.py`
+- `tests/test_docs_site.py`
+- `docs/file-reading-eval/`
+- `examples/file_reading_eval/`
+
+### Files Changed
+
+- `README.md`
+- `README.zh-CN.md`
+- `mkdocs.yml`
+- `docs/file-reading-eval/README.md`
+- `docs/file-reading-eval/README.zh-CN.md`
+- `docs/file-reading-eval/cli-guide.md`
+- `docs/file-reading-eval/cli-guide.zh-CN.md`
+- `docs/file-reading-eval/sample-run.md`
+- `docs/file-reading-eval/sample-run.zh-CN.md`
+- `docs/file-reading-eval/report-examples.md`
+- `docs/file-reading-eval/report-examples.zh-CN.md`
+- `examples/file_reading_eval/README.md`
+- `examples/file_reading_eval/agents/dummy_good_reader.py`
+- `examples/file_reading_eval/agents/dummy_bad_citation_reader.py`
+- `examples/file_reading_eval/corpus/contract_policy.md`
+- `examples/file_reading_eval/corpus/incident_notes.md`
+- `examples/file_reading_eval/corpus/payment_terms.md`
+- `examples/file_reading_eval/corpus/distractor_release_notes.md`
+- `examples/file_reading_eval/tasks/sample_tasks.jsonl`
+- `examples/file_reading_eval/profiles/cautious_reader_profile.json`
+- `examples/file_reading_eval/target_outputs/good_output.json`
+- `examples/file_reading_eval/target_outputs/bad_citation_output.json`
+- `examples/file_reading_eval/target_outputs/hallucinated_output.json`
+- `examples/file_reading_eval/target_outputs/no_citation_output.json`
+- `examples/file_reading_eval/expected_reports/corpus_manifest.example.json`
+- `examples/file_reading_eval/expected_reports/reference_result.example.json`
+- `examples/file_reading_eval/expected_reports/deterministic_report.example.json`
+- `examples/file_reading_eval/expected_reports/deterministic_report.example.md`
+- `tests/test_file_reading_docs_examples.py`
+- `bug_audit.md`
+
+### Docs Added
+
+- `docs/file-reading-eval/cli-guide.md`
+- `docs/file-reading-eval/cli-guide.zh-CN.md`
+- `docs/file-reading-eval/sample-run.md`
+- `docs/file-reading-eval/sample-run.zh-CN.md`
+- `docs/file-reading-eval/report-examples.md`
+- `docs/file-reading-eval/report-examples.zh-CN.md`
+- Updated `docs/file-reading-eval/README.md`
+- Updated `docs/file-reading-eval/README.zh-CN.md`
+
+### Examples Added
+
+- Synthetic corpus files under `examples/file_reading_eval/corpus/`.
+- `examples/file_reading_eval/tasks/sample_tasks.jsonl`.
+- `examples/file_reading_eval/profiles/cautious_reader_profile.json`.
+- Target output examples under `examples/file_reading_eval/target_outputs/`.
+- Report, manifest, and reference result examples under `examples/file_reading_eval/expected_reports/`.
+
+### Tests Added
+
+- `tests/test_file_reading_docs_examples.py`
+  - Parses committed file-reading sample JSON files.
+  - Imports the sample corpus into a temp directory and validates `sample_tasks.jsonl`.
+  - Validates target output JSON examples.
+  - Checks sample report JSON/Markdown for expected fields, local path safety, and obvious secret-like placeholder absence.
+  - Confirms CLI guide commands exist and module help commands run.
+  - Confirms English and zh-CN docs exist and mention required example paths.
+  - Confirms `.gitignore` keeps runtime artifacts ignored without ignoring committed examples.
+  - Confirms LLM judge docs are optional/safety-sensitive and benchmark/reference language remains contextual.
+  - Runs a deterministic grader smoke check over good, bad-citation, hallucinated, and no-citation target output examples.
+  - Runs a tiny sample-run smoke check through `dummy_good_reader.py` against `sample_tasks.jsonl` and asserts a high deterministic score.
+
+### Commands Run
+
+- `python -m contract2agent.cli --help` - passed.
+- `python -m contract2agent.cli file-eval --help` - passed.
+- `python -m contract2agent.cli file-eval help llm` - passed.
+- `python -m contract2agent.cli file-eval doctor --plain` - passed.
+- `c2a --help` - skipped as unavailable in the current shell; `python -m contract2agent.cli` was verified and docs explain that `c2a` requires installation/PATH.
+- `python -m pytest tests\test_file_reading_docs_examples.py` - 11 passed.
+- `python -m pytest tests\test_file_reading_eval.py tests\test_file_reading_llm_judge.py` - 47 passed.
+- `python -m pytest tests\test_docs_site.py` - 62 passed.
+- `python -m pytest` - 354 passed.
+- `python -m compileall -q contract2agent tests scripts` - passed.
+- `python scripts\check_docs_links.py` - checked 46 Markdown files; all relative links resolve.
+- `python -m mkdocs build --strict` - first run failed with 44 warnings because MkDocs strict mode treats links from docs pages to files outside `docs/` as unresolved documentation links; fixed by converting those example references to code paths and adding tests that verify the files exist.
+- `python -m mkdocs build --strict` - passed after the link-shape fix.
+- `git diff --check` - passed.
+- `node --check docs/assets/agent-eval.js` - skipped; JavaScript assets were not changed.
+- `node --check docs/assets/app.js` - skipped; JavaScript assets were not changed.
+
+### Results
+
+- Added English and zh-CN file-reading documentation for overview, CLI use, sample run walkthrough, report examples, scoring dimensions, failure modes, improvement guidance, reference import discipline, and comparison rules.
+- Added small synthetic sample corpus, task pack, target outputs, profile, and report/reference examples.
+- Added regression tests for docs/example integrity and deterministic sample grading.
+- Preserved existing file-reading CLI behavior, deterministic default grading, optional LLM judge separation, report redaction behavior, and benchmark-reference contextual language.
+
+### Safety Checks
+
+- Examples are synthetic.
+- No committed example is under `.runs/`, `.judge_cache/`, or generated `file_reading_eval/`.
+- Documentation uses module CLI commands first and explains `c2a` requires installation.
+- Documentation states deterministic grading requires no API key and optional LLM judging is explicit and safety-sensitive.
+- Benchmark and reference language remains contextual unless tied to compatible observed results.
+- Expected reports contain no local absolute paths or API-key-like placeholder values.
+- Docs do not instruct GitHub Pages to run live evaluations, make API calls, or perform network imports by default.
+- Runtime directories remain ignored by `.gitignore`.
+
+### Remaining Follow-Ups
+
+- `c2a` is not currently available on PATH in this shell; use `python -m contract2agent.cli` or install the package editable before relying on the console script.
+- Rich reference ingestion remains planned; current docs describe implemented local metadata support and mark broader reference import as roadmap.
+
 ## Full Project Audit - Brooks Lint Pass
 
 ### Audit Scope

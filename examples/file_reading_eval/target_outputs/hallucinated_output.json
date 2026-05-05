@@ -1,0 +1,10 @@
+{
+  "task_id": "sample_refund_notice_period",
+  "answer": "Refunds are approved automatically after 24 hours.",
+  "citations": [],
+  "confidence": 0.77,
+  "files_read": [
+    "distractor_release_notes.md"
+  ],
+  "notes": "Synthetic sample output that invents a policy not supported by the corpus."
+}
