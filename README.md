@@ -1,5 +1,7 @@
 # Contract2Agent
 
+[English](./README.md) | [中文](./README.zh-CN.md)
+
 Pre-runtime AI agent evaluation and outcome prediction for agent profiles, tool surfaces, permissions, sample tasks, and available evidence.
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776ab)](https://www.python.org/)
@@ -73,12 +75,13 @@ Financial transaction agents are simulation-only. Contract2Agent does not suppor
 
 ## Static Demo
 
-The GitHub Pages agent evaluation demo is static and browser-only:
+The GitHub Pages agent evaluation demo is static, browser-only, and bilingual:
 
 - Local page: [docs/agent-eval/index.html](docs/agent-eval/index.html)
 - Public route: `https://shiki-dml.github.io/Contract2Agent/agent-eval/`
 - Assets: [docs/assets/agent-eval.js](docs/assets/agent-eval.js), [docs/assets/agent-eval.css](docs/assets/agent-eval.css)
 - Static data: [docs/data/agent_eval/source_references.json](docs/data/agent_eval/source_references.json)
+- Language switch: English / 中文, persisted locally in the browser.
 
 The demo lets users enter:
 
@@ -92,7 +95,7 @@ The demo lets users enter:
 
 It returns classified agent type(s), inferred capabilities, matched signals, risk flags, applicable eval categories, preliminary scorecard, outcome prediction, evidence basis, source references, missing evidence, recommended next tests, JSON export, and Markdown export.
 
-The demo does not run real experiments, call APIs, use API keys, execute code, submit forms, fetch live benchmark data, or perform real financial actions.
+The demo has no backend. It does not run real experiments, call APIs, use API keys, execute code, submit forms, fetch live benchmark data, or perform real financial actions.
 
 ## Legacy Contract Playground
 
@@ -178,7 +181,8 @@ markdown = ReportRenderer().render_markdown(profile, evidence, scorecard, predic
 |-- scripts/
 |-- tests/
 |-- pyproject.toml
-`-- README.md
+|-- README.md
+`-- README.zh-CN.md
 ```
 
 ## Testing
@@ -228,6 +232,7 @@ Contract2Agent is an experimental developer framework for structured agent evalu
 - Run `python -m pytest` before opening PRs.
 - Keep behavior deterministic and testable.
 - Do not fabricate benchmark or experiment evidence.
+- Keep README.md and README.zh-CN.md structurally aligned.
 - Keep GitHub Pages static and backend-free.
 - Do not commit caches, virtual environments, generated reports, runtime data, or local junk.
 

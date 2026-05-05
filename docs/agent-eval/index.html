@@ -4,23 +4,37 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Contract2Agent Agent Evaluation Demo</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="../assets/agent-eval.css">
   </head>
   <body class="agent-eval-page">
     <main class="ae-shell">
       <header class="ae-header">
-        <h1>Agent Evaluation Demo</h1>
-        <p>
-          Enter an agent profile to get a preliminary, evidence-aware report. This static page classifies broad agent types and recommends eval categories; it does not run live experiments, call APIs, or assign benchmark scores.
-        </p>
+        <div class="ae-header-copy">
+          <p class="ae-kicker" data-i18n="page.kicker">Static pre-runtime agent evaluation</p>
+          <h1 data-i18n="page.title">Agent Evaluation Demo</h1>
+          <p data-i18n="page.description">
+            Enter an agent profile to get a preliminary, evidence-aware report. The demo classifies broad agent types, recommends eval categories, and keeps benchmark references contextual.
+          </p>
+          <p class="ae-static-note" data-i18n="page.staticNote">
+            No backend, external API calls, live model calls, or real financial actions.
+          </p>
+        </div>
+        <div class="ae-language" role="group" aria-label="Language" data-i18n-aria="language.aria">
+          <button type="button" class="ae-lang-button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" class="ae-lang-button" data-lang="zh" aria-pressed="false">中文</button>
+        </div>
       </header>
 
       <section class="ae-layout">
         <form id="agent-eval-form" class="ae-panel ae-form">
-          <h2>Agent Profile</h2>
+          <div class="ae-panel-header">
+            <h2 data-i18n="form.title">Agent Profile</h2>
+            <p data-i18n="form.description">Describe the agent surface before runtime. Sparse inputs intentionally produce low-confidence results.</p>
+          </div>
 
           <div class="ae-field">
-            <label for="sample-profile">Sample profile</label>
+            <label for="sample-profile" data-i18n="form.sampleProfile">Sample profile</label>
             <div class="ae-inline-action">
               <select id="sample-profile" name="sample-profile">
                 <option value="coding_file_reading_hybrid">Coding / file-reading hybrid</option>
@@ -29,89 +43,97 @@
                 <option value="simulated_financial_transaction_agent">Simulated financial transaction agent</option>
                 <option value="contract_review_agent">Contract-review agent</option>
               </select>
-              <button class="ae-button secondary" type="button" id="load-sample-profile">Load sample</button>
+              <button class="ae-button secondary" type="button" id="load-sample-profile" data-i18n="actions.loadSample">Load sample</button>
             </div>
           </div>
 
           <div class="ae-grid">
             <div class="ae-field">
-              <label for="agent-name">Agent name</label>
+              <label for="agent-name" data-i18n="form.agentName">Agent name</label>
               <input id="agent-name" name="agent-name" autocomplete="off" value="Demo agent">
             </div>
             <div class="ae-field">
-              <label for="autonomy-level">Autonomy level</label>
+              <label for="autonomy-level" data-i18n="form.autonomyLevel">Autonomy level</label>
               <select id="autonomy-level" name="autonomy-level">
-                <option value="unknown">Unknown</option>
-                <option value="low">Low</option>
-                <option value="medium" selected>Medium</option>
-                <option value="high">High</option>
+                <option value="unknown" data-i18n="options.autonomy.unknown">Unknown</option>
+                <option value="low" data-i18n="options.autonomy.low">Low</option>
+                <option value="medium" selected data-i18n="options.autonomy.medium">Medium</option>
+                <option value="high" data-i18n="options.autonomy.high">High</option>
               </select>
             </div>
           </div>
 
           <div class="ae-field">
-            <label for="agent-description">Agent description</label>
+            <label for="agent-description" data-i18n="form.agentDescription">Agent description</label>
             <textarea id="agent-description" name="agent-description">Edits local repository files, runs tests, and reports patch evidence.</textarea>
           </div>
 
           <div class="ae-field">
-            <label for="declared-capabilities">Declared capabilities</label>
+            <label for="declared-capabilities" data-i18n="form.declaredCapabilities">Declared capabilities</label>
             <textarea id="declared-capabilities" name="declared-capabilities">edit code, run tests, summarize diffs</textarea>
           </div>
 
           <div class="ae-field">
-            <label for="tool-names">Tools / tool names</label>
+            <label for="tool-names" data-i18n="form.toolNames">Tools / tool names</label>
             <textarea id="tool-names" name="tool-names">file_reader, code_editor, shell, test_runner</textarea>
           </div>
 
           <div class="ae-field">
-            <label for="tool-permissions">Tool permissions</label>
+            <label for="tool-permissions" data-i18n="form.toolPermissions">Tool permissions</label>
             <textarea id="tool-permissions" name="tool-permissions">read_workspace, write_workspace, run_tests</textarea>
           </div>
 
-          <div class="ae-checks" aria-label="Permission flags">
-            <label><input type="checkbox" id="can-read-files" checked> Can read files</label>
-            <label><input type="checkbox" id="can-write-files" checked> Can write files</label>
-            <label><input type="checkbox" id="can-run-code" checked> Can run code</label>
-            <label><input type="checkbox" id="can-use-browser"> Can use browser</label>
-            <label><input type="checkbox" id="can-use-network"> Can use network</label>
-            <label><input type="checkbox" id="can-execute-transactions"> Can execute transactions</label>
-            <label><input type="checkbox" id="can-modify-external-state"> Can modify external state</label>
-            <label><input type="checkbox" id="requires-human-approval" checked> Requires human approval</label>
-          </div>
+          <fieldset class="ae-fieldset">
+            <legend data-i18n="form.permissionFlags">Capability and safety flags</legend>
+            <div class="ae-checks" aria-label="Permission flags" data-i18n-aria="form.permissionFlags">
+              <label><input type="checkbox" id="can-read-files" checked> <span data-i18n="flags.canReadFiles">Can read files</span></label>
+              <label><input type="checkbox" id="can-write-files" checked> <span data-i18n="flags.canWriteFiles">Can write files</span></label>
+              <label><input type="checkbox" id="can-run-code" checked> <span data-i18n="flags.canRunCode">Can run code</span></label>
+              <label><input type="checkbox" id="can-use-browser"> <span data-i18n="flags.canUseBrowser">Can use browser</span></label>
+              <label><input type="checkbox" id="can-use-network"> <span data-i18n="flags.canUseNetwork">Can use network</span></label>
+              <label><input type="checkbox" id="can-execute-transactions"> <span data-i18n="flags.canExecuteTransactions">Can execute transactions</span></label>
+              <label><input type="checkbox" id="can-modify-external-state"> <span data-i18n="flags.canModifyExternalState">Can modify external state</span></label>
+              <label><input type="checkbox" id="requires-human-approval" checked> <span data-i18n="flags.requiresHumanApproval">Requires human approval</span></label>
+            </div>
+          </fieldset>
 
           <div class="ae-field">
-            <label for="sample-tasks">Sample tasks</label>
+            <label for="sample-tasks" data-i18n="form.sampleTasks">Sample tasks</label>
             <textarea id="sample-tasks" name="sample-tasks">Fix failing tests with a minimal patch. Run tests before reporting success.</textarea>
           </div>
 
           <div class="ae-field">
-            <label for="policy-constraints">Policy constraints</label>
+            <label for="policy-constraints" data-i18n="form.policyConstraints">Policy constraints</label>
             <textarea id="policy-constraints" name="policy-constraints">Stay inside workspace. Do not run destructive commands.</textarea>
           </div>
 
           <div class="ae-field">
-            <label for="experiment-summary">Optional pasted experiment summary</label>
-            <textarea id="experiment-summary" name="experiment-summary" placeholder="Paste a short trace/result summary or JSON summary."></textarea>
+            <label for="experiment-summary" data-i18n="form.experimentSummary">Optional pasted experiment summary</label>
+            <textarea id="experiment-summary" name="experiment-summary" placeholder="Paste a short trace/result summary or JSON summary." data-i18n-placeholder="form.experimentPlaceholder"></textarea>
           </div>
 
           <div class="ae-actions">
-            <button class="ae-button" type="submit">Generate report</button>
+            <button class="ae-button" type="submit" data-i18n="actions.generateReport">Generate report</button>
           </div>
         </form>
 
         <section class="ae-panel ae-results" aria-live="polite">
-          <h2>Preliminary Report</h2>
-          <div id="agent-eval-output"></div>
-
-          <div class="ae-section">
-            <h3>JSON Export</h3>
-            <textarea id="json-export" class="ae-export" readonly></textarea>
+          <div class="ae-panel-header">
+            <h2 data-i18n="report.title">Preliminary Report</h2>
+            <p data-i18n="report.description">Static classification and evidence-aware prediction, not a benchmark score.</p>
           </div>
+          <div id="agent-eval-output" class="ae-report"></div>
 
-          <div class="ae-section">
-            <h3>Markdown Export</h3>
-            <textarea id="markdown-export" class="ae-export" readonly></textarea>
+          <div class="ae-export-grid">
+            <div class="ae-section">
+              <h3 data-i18n="exports.json">JSON Export</h3>
+              <textarea id="json-export" class="ae-export" readonly></textarea>
+            </div>
+
+            <div class="ae-section">
+              <h3 data-i18n="exports.markdown">Markdown Export</h3>
+              <textarea id="markdown-export" class="ae-export" readonly></textarea>
+            </div>
           </div>
         </section>
       </section>

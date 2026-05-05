@@ -12,7 +12,7 @@ FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
 
 
 def main() -> int:
-    files = [REPO_ROOT / "README.md"]
+    files = sorted(REPO_ROOT.glob("README*.md"))
     files.extend(sorted((REPO_ROOT / "docs").glob("**/*.md")))
     files.extend(sorted((REPO_ROOT / "examples").glob("**/*.md")))
 

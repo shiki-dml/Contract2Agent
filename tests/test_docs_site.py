@@ -2633,10 +2633,149 @@ def test_agent_eval_demo_is_static_and_has_required_inputs_outputs() -> None:
     ):
         assert required in combined
 
+    assert "No backend" in combined
+    assert "external API calls" in combined
+
     forbidden_runtime = ("api.openai.com", "XMLHttpRequest", "WebSocket", "eval(")
     for forbidden in forbidden_runtime:
         assert forbidden not in combined
     assert "API key" not in combined
+
+
+def test_agent_eval_demo_has_language_switch_and_i18n_dictionary() -> None:
+    html = (ROOT / "docs" / "agent-eval" / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "docs" / "assets" / "agent-eval.js").read_text(encoding="utf-8")
+
+    assert 'data-lang="en"' in html
+    assert 'data-lang="zh"' in html
+    assert 'data-i18n="page.title"' in html
+    assert 'data-i18n="form.agentDescription"' in html
+    assert 'data-i18n="exports.markdown"' in html
+    assert "const I18N" in js
+    assert "localStorage" in js
+    assert "URLSearchParams" in js
+    assert "智能体评估演示" in js
+    assert "缺失证据" in js
+    assert "金融交易仅限模拟" in js
+
+
+def test_agent_eval_static_demo_sample_loading_and_chinese_rendering() -> None:
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is required to execute the static agent eval demo")
+
+    js_path = ROOT / "docs" / "assets" / "agent-eval.js"
+    script = f"""
+const fs = require("fs");
+const vm = require("vm");
+const code = fs.readFileSync({json.dumps(str(js_path))}, "utf8");
+function makeElement(id) {{
+  const listeners = {{}};
+  return {{
+    id,
+    value: id === "sample-profile" ? "coding_file_reading_hybrid" : "",
+    checked: false,
+    textContent: "",
+    innerHTML: "",
+    dataset: {{}},
+    style: {{}},
+    listeners,
+    addEventListener(type, handler) {{ listeners[type] = handler; }},
+    setAttribute(name, value) {{ this[name] = value; }},
+    getAttribute(name) {{ return this[name] || ""; }},
+    classList: {{ toggle() {{}}, add() {{}}, remove() {{}} }}
+  }};
+}}
+const elements = new Map();
+[
+  "agent-eval-form",
+  "sample-profile",
+  "load-sample-profile",
+  "agent-name",
+  "autonomy-level",
+  "agent-description",
+  "declared-capabilities",
+  "tool-names",
+  "tool-permissions",
+  "can-read-files",
+  "can-write-files",
+  "can-run-code",
+  "can-use-browser",
+  "can-use-network",
+  "can-execute-transactions",
+  "can-modify-external-state",
+  "requires-human-approval",
+  "sample-tasks",
+  "policy-constraints",
+  "experiment-summary",
+  "agent-eval-output",
+  "json-export",
+  "markdown-export"
+].forEach((id) => elements.set(id, makeElement(id)));
+const languageButtons = [
+  {{ dataset: {{ lang: "en" }}, classList: {{ toggle() {{}} }}, setAttribute() {{}}, addEventListener() {{}} }},
+  {{ dataset: {{ lang: "zh" }}, classList: {{ toggle() {{}} }}, setAttribute() {{}}, addEventListener() {{}} }}
+];
+const document = {{
+  documentElement: {{ lang: "" }},
+  listeners: {{}},
+  addEventListener(type, handler) {{ this.listeners[type] = handler; }},
+  getElementById(id) {{
+    if (!elements.has(id)) {{
+      elements.set(id, makeElement(id));
+    }}
+    return elements.get(id);
+  }},
+  querySelectorAll(selector) {{
+    return selector === "[data-lang]" ? languageButtons : [];
+  }}
+}};
+const storage = {{}};
+const window = {{
+  location: {{ search: "?lang=zh" }},
+  localStorage: {{
+    getItem(key) {{ return storage[key] || ""; }},
+    setItem(key, value) {{ storage[key] = value; }}
+  }}
+}};
+const context = {{ document, window, console, URLSearchParams }};
+vm.runInNewContext(code, context);
+(async () => {{
+  document.listeners.DOMContentLoaded();
+  await Promise.resolve();
+  elements.get("sample-profile").value = "browser_navigation_agent";
+  elements.get("load-sample-profile").listeners.click();
+  process.stdout.write(JSON.stringify({{
+    language: context.window.Contract2AgentEvalDemo.getLanguage(),
+    document_lang: document.documentElement.lang,
+    browser_checked: elements.get("can-use-browser").checked,
+    network_checked: elements.get("can-use-network").checked,
+    output_html: elements.get("agent-eval-output").innerHTML,
+    markdown: elements.get("markdown-export").value,
+    json_export: elements.get("json-export").value
+  }}));
+}})().catch((error) => {{
+  console.error(error && error.stack ? error.stack : error);
+  process.exit(1);
+}});
+"""
+    completed = subprocess.run(
+        [node, "-e", script],
+        text=True,
+        encoding="utf-8",
+        capture_output=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(completed.stdout)
+
+    assert result["language"] == "zh"
+    assert result["document_lang"] == "zh-CN"
+    assert result["browser_checked"] is True
+    assert result["network_checked"] is True
+    assert "浏览器导航智能体" in result["output_html"]
+    assert "证据依据" in result["output_html"]
+    assert result["markdown"].startswith("# 智能体评估报告")
+    assert "browser_navigation_agent" in result["json_export"]
 
 
 def test_agent_eval_static_source_reference_json_exists_and_is_contextual() -> None:
@@ -2771,6 +2910,39 @@ def test_readme_preview_asset_and_local_links_exist() -> None:
     ]
     for target in local_links:
         assert (ROOT / target).exists(), target
+
+
+def test_bilingual_readmes_are_linked_and_project_aligned() -> None:
+    readme_path = ROOT / "README.md"
+    zh_path = ROOT / "README.zh-CN.md"
+    readme = readme_path.read_text(encoding="utf-8")
+    zh = zh_path.read_text(encoding="utf-8")
+    language_switch = "[English](./README.md) | [中文](./README.zh-CN.md)"
+
+    assert readme_path.exists()
+    assert zh_path.exists()
+    assert language_switch in readme
+    assert language_switch in zh
+    assert "Pre-runtime AI agent evaluation" in readme
+    assert "预运行 AI 智能体评估" in zh
+
+    for english_heading, chinese_heading in (
+        ("## Project Purpose", "## 项目目的"),
+        ("## Evaluation-First Design", "## 评估优先设计"),
+        ("## Static Demo", "## 静态演示"),
+        ("## CLI Usage", "## CLI 用法"),
+        ("## Testing", "## 测试"),
+        ("## Limitations", "## 限制"),
+    ):
+        assert english_heading in readme
+        assert chinese_heading in zh
+
+    assert "no backend" in readme.lower()
+    assert "没有后端" in zh
+    assert "Benchmark references are contextual" in readme
+    assert "基准引用" in zh
+    assert "simulation-only" in readme.lower()
+    assert "仅限模拟" in zh
 
 
 def test_readme_internal_anchor_links_match_headings() -> None:
