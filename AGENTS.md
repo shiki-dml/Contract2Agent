@@ -1,200 +1,112 @@
 # AGENTS.md
 
-## Project
+This is the short operating contract for future agents. Repository docs are the
+source of truth; do not rely on prior chat history or unverified feature claims.
 
-Contract2Agent is an evaluation-first framework for pre-runtime AI agent diagnosis, capability classification, eval category selection, evidence-backed preliminary scoring, and cautious outcome prediction.
+## Project Identity
 
-The project is evolving from a narrow contract-dispute playground into a generalized agent evaluation framework that supports concrete agent categories through typed adapters and eval packs.
+- Project: Contract2Agent.
+- Purpose: pre-runtime AI agent diagnosis, capability classification, eval
+  selection, evidence-backed preliminary scoring, and cautious prediction.
+- Status: evolving and incomplete; treat inventories as evidence to verify.
+- Non-goal: not a fake universal judge. It uses typed schemas, deterministic
+  logic, eval packs, observed evidence, and explicit missing-evidence records.
 
-Core product flow:
+## Hard Rules
 
-AgentInput
--> AgentProfile normalization
--> capability signal extraction
--> capability classification
--> evidence source resolution
--> eval category selection
--> preliminary scoring
--> cautious pre-runtime outcome prediction
--> Markdown / JSON report generation
+- Preserve behavior unless an approved sprint contract changes it; do not
+  rename, rewrite business logic, or perform broad harness refactors.
+- Keep GitHub Pages static; do not add a backend, browser-run tests, or real
+  financial transactions.
+- Do not fabricate benchmark claims, observed runs, scores, or experiment
+  results.
+- Do not mark features verified without evaluator evidence.
+- Keep declared, inferred, observed, reference, prediction, and missing
+  evidence separate.
+- Do not add production dependencies unless the sprint contract justifies them.
+- Do not weaken path containment, secret filtering, generated-artifact
+  exclusions, or command safety checks.
+- Check `git status --short` before and after work; do not stage, commit, reset,
+  delete, or rename files unless explicitly asked.
 
-## Product Principles
+## Where To Look First
 
-- Do not build a fake universal judge for arbitrary agents.
-- Build a generalized evaluation framework that supports many agent types through typed adapters and eval packs.
-- Scores must be evidence-backed.
-- Declared capabilities are not proof of performance.
-- Missing evidence must be represented explicitly.
-- Benchmark references are contextual evidence, not direct scores unless this project actually ran the comparable evaluation.
-- Specialized agent families may be added later, but the framework must not overfit to exact sample names or fixtures.
-- GitHub Pages must remain static unless a future task explicitly designs a safe non-static architecture.
+- `README.md`: public overview and quick usage.
+- `docs/PROJECT_CONTEXT.md`: scope, constraints, evidence discipline.
+- `docs/ARCHITECTURE.md` and `docs/CODEMAP.md`: architecture and repo map.
+- `docs/GOLDEN_PRINCIPLES.md` and `docs/DECISIONS.md`: principles and ADRs.
+- `docs/AGENT_HANDOFF.md`: current status, risks, and next prompt.
+- `docs/harness/README.md`, `QUALITY_GATES.md`, `PROGRESS.md`: harness flow.
+- `docs/harness/feature_registry.json`: feature status evidence.
 
-## Current Priority
+## Repository Map
 
-Prioritize Python core framework, schemas, deterministic scoring, eval packs, experiment result models, report rendering, README repositioning, and tests.
+- `contract2agent/`: package code, CLI, contract checks, diagnosis, reports.
+- `contract2agent/evaluation/`: schemas, evidence, scoring, prediction, reports.
+- `contract2agent/evaluation/file_reading/`: corpus/task/run/grade/report flow.
+- `contract2agent/triage/`, `cost_estimate/`, `patch_preview/`: static planning,
+  estimate, and preview-only patch proposal subsystems.
+- `tests/`, `examples/`, `docs/`, `scripts/`: tests, fixtures, docs, helpers.
+- `.codex/` and `.agents/skills/`: project-local agent/skill configuration when
+  available; verify runtime support before relying on it.
 
-Do not prioritize GitHub Pages UI expansion until the core evaluation framework is stable.
+Use `docs/CODEMAP.md` for the full map; do not copy it here.
 
-## File Reading Agent Evaluation Priority
+## Common Commands
 
-The first specialized agent adapter should be `file_reading_agent`.
+Use the repository Python environment. In WSL or POSIX shells, `python3` may be
+the active interpreter; on Windows docs may show `python`.
 
-This adapter must go beyond profile-only classification. It should support a CLI-based local evaluation runner that can import corpora, build or load tasks, run a target agent, capture traces, grade outputs, compare against reference results, and produce actionable improvement reports.
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest
+PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider
+python -m compileall -q contract2agent tests scripts
+python scripts/check_docs_links.py
+python -m pip install -e ".[docs]"
+python -m mkdocs build --strict
+bash scripts/harness/doctor.sh
+bash scripts/harness/run_tests.sh
+python scripts/harness/validate_docs.py
+```
 
-For file-reading agents, performance scores require observed runs. A profile-only assessment may produce readiness, risk, and recommended eval plans, but must not claim actual reading performance.
+Validation note, 2026-05-06: WSL `/usr/bin/python3` had pip 24.0, but
+`python3 -m pip install --user "pytest>=7.0"` failed with `externally-managed-environment`;
+pytest remained missing, so runtime validation is not proven in that environment.
 
-The file-reading evaluation framework should distinguish:
+## Agent Roles
 
-- declared file-reading capability
-- tool-surface inference
-- observed file-reading behavior
-- answer correctness
-- citation grounding
-- file selection quality
-- abstention behavior
-- forbidden-file safety
-- reference benchmark context
-- comparable reference-agent results
-- missing evidence
+- `codebase_mapper`, `test_inventory_agent`, `docs_inventory_agent`, `feature_inventory_agent`, and `harness_planner` are read-only.
+- `contract_generator` writes only approved/proposed sprint contracts, normally under `docs/harness/sprints/<id>/contract.md`.
+- `evaluator` is read-only, gives PASS / FAIL / INCONCLUSIVE / BLOCKED, and must not fix issues; only evaluator evidence can justify verified claims.
+- `bug_reviewer` is read-only, reports correctness/regression risks, and must not fix issues.
+- `doc_gardener` writes approved docs/README/CODEMAP/ARCHITECTURE docs only; it must not edit feature registry, sprint contracts, handoff, or progress unless a specific approved task says so.
+- `handoff_writer` writes only handoff/progress artifacts such as `docs/AGENT_HANDOFF.md` and `docs/harness/PROGRESS.md`.
+- `feature_generator` modifies implementation/docs/tests only under an approved sprint contract and only inside allowed files.
+- No agent may mark features verified or sprints complete without explicit evaluator evidence.
 
-Reference benchmarks, public papers, and curated datasets may be used to design tasks or provide contextual comparison, but they are not direct scores unless the same agent or comparable workflow was actually evaluated under documented conditions.
+## Handoff And Progress
 
-Network import of public datasets or papers must be explicit and controlled. Prefer local import first. Any network-enabled import command must require an explicit `--allow-network` flag and must store source, license, provenance, and limitations metadata.
+- Before changing files, read handoff/progress and relevant codemap/architecture docs.
+- Sprint contracts belong to `contract_generator`; implementation changes belong to `feature_generator` under an approved contract and allowed files.
+- Feature registry updates require explicit scope and evidence; never mark unknown features failed.
+- Handoff/progress belongs to `handoff_writer`; record branch, status, files, commands, tests, blockers, risks, and next prompt there.
+- Broad writers must not casually edit registry, contracts, handoff, or progress.
+- Do not fabricate validation, and do not reinterpret failed or blocked commands as passing.
 
-GitHub Pages must remain a static viewer/demo. Long-running file-reading evaluations should run in the CLI, local scripts, or CI-generated artifacts, not in the browser.
+## Done Definition
 
-Optional LLM judge support may supplement file-reading evaluation only when the user explicitly requests it. Deterministic grading remains the default, and baseline file-reading evaluation must make no API calls.
+- Scope matches the request or sprint contract, and changed files are allowed.
+- Tests or validation ran, or blockers are recorded honestly.
+- Docs, CLI help, examples, registry, and handoff/progress are aligned when
+  required.
+- Evaluator evidence exists for verified claims.
+- No generated caches, secrets, local runtime data, or unrelated edits are left
+  for future agents to untangle.
 
-LLM judge policy:
+## What Not To Put Here
 
-- Keep deterministic scores and LLM judge scores separate.
-- Mark LLM judge outputs as judge-based and non-deterministic.
-- Run deterministic graders before any optional judge selection.
-- Use LLM judges only for semantic equivalence, open-ended answer quality, summary faithfulness, contradiction risk, evidence support, and recommendation synthesis.
-- Do not use LLM judges for citation quote match, citation span existence, forbidden-file access, schema compliance, timeouts, hashes, or path containment.
-- If judge output is invalid or a judge call fails, record the failure and fall back to deterministic grades.
-
-API key handling rules:
-
-- Prefer environment variables such as `OPENAI_API_KEY`.
-- If no key is configured and the user explicitly chooses LLM judging in an interactive terminal, use hidden session-only input.
-- Never write API keys to disk, reports, logs, caches, browser code, docs examples, or committed files.
-- Do not expose API keys through GitHub Pages or static assets.
-
-Token and cost budget rules:
-
-- Provide controls for judge-only task selection, max judge tasks, max input chars, max output tokens, evidence snippet limits, cost budget, dry-run estimates, and judge cache on/off.
-- Send compact judge inputs only: task, question, agent answer, citations, cited snippets, gold answer/evidence, deterministic grade summary, failure modes, and judge instructions.
-- Do not send full corpora, forbidden files, secrets, or unsanitized absolute paths to a judge.
-- Cache judge results by task/output/evidence/provider/model/prompt hash when enabled.
-
-CLI experience requirements for `file-eval`:
-
-- Maintain rich help for workflow, deterministic grading, LLM judging, scoring, examples, references, and doctor checks.
-- Keep colorful output optional and support `--no-color`, `--plain`, `--json`, `--quiet`, and `--verbose` where useful.
-- Make terminal output scriptable and do not make tests depend on ANSI color.
-- Keep README, docs, examples, and CLI help aligned with implemented behavior.
-
-File-reading agent evaluation must include tests for:
-
-- corpus manifest creation
-- local file import
-- task loading
-- citation span verification
-- answer grading
-- unanswerable/abstention behavior
-- forbidden-file boundary
-- reference-result compatibility
-- dummy-agent CLI runs
-- report generation
-- no observed score without observed run
-- optional LLM judge safety, budgets, caching, and deterministic fallback
-- CLI help, doctor output, no-color/plain/json modes, and documentation examples
-
-## Supported Agent Families
-
-The default framework should support:
-
-- `coding_agent`
-- `file_reading_agent`
-- `contract_review_agent`
-- `browser_navigation_agent`
-- `research_agent`
-- `workflow_automation_agent`
-- `financial_transaction_agent_simulated`
-- `unknown_agent`
-
-Financial transaction evaluation is simulation-only. Do not implement real payment, trading, ordering, or other financial side effects.
-
-## Preferred Skills
-
-Use `agent-eval-architect` for framework-level evaluation architecture.
-Use `file-reading-eval-architect` for file-reading corpora, tasks, runners, graders, comparisons, and reports.
-Use `research-grounded-eval` when collecting or structuring benchmark and research references.
-Use `smart-patcher` only for localized bug fixes and regression repairs.
-
-## Setup
-
-Use the repository's Python environment. If dependencies are missing, prefer the project's configured optional extras.
-
-Common commands:
-
-    python -m pip install -e ".[dev]"
-    python -m pip install -e ".[docs]"
-    python -m pytest
-    python -m compileall -q contract2agent tests scripts
-    python scripts/check_docs_links.py
-    python -m mkdocs build --strict
-
-## Implementation Rules
-
-- Preserve deterministic behavior.
-- Prefer dataclasses or existing project schema style unless Pydantic is already clearly required.
-- Keep schemas JSON-serializable.
-- Do not add production dependencies unless explicitly approved.
-- Do not implement a runtime backend for GitHub Pages.
-- Do not make the browser run arbitrary agent experiments.
-- Do not implement real financial transactions.
-- Financial transaction evaluation must remain simulated-only unless a future sandbox and compliance design is explicitly added.
-- Do not hard-code exact sample agent names.
-- Do not hard-code benchmark claims.
-- Do not fabricate experiment results.
-- Distinguish declared capability from inferred capability, observed evidence, reference evidence, prediction, and missing evidence.
-- Keep README, CLI, docs, and tests aligned with implemented behavior.
-- Preserve old contract diagnosis functionality unless intentionally deprecated and tested.
-
-## Testing Rules
-
-After framework changes, run:
-
-    python -m pytest
-
-When relevant, also run:
-
-    python -m compileall -q contract2agent tests scripts
-    python scripts/check_docs_links.py
-    python -m mkdocs build --strict
-
-Add focused tests for:
-
-- schema serialization
-- capability classification
-- eval pack selection
-- evidence-aware scoring
-- unknown-agent handling
-- benchmark-reference handling
-- report generation
-- README/docs integrity
-- anti-overfitting behavior
-
-## Cleanup Rules
-
-- Do not commit caches, virtual environments, generated reports, local runtime data, or `.pyc` files.
-- Keep intentional sample data under `examples/`, `tests/fixtures/`, or `docs/data/`.
-- Sanitize local absolute paths before committing troubleshooting notes.
-
-## Safety Rules
-
-- Do not weaken path containment, secret filtering, generated-artifact exclusions, or command safety checks.
-- Do not read or commit `.env`, credentials, tokens, SSH keys, browser data, or private user files.
-- Do not remove regression tests added for bug fixes.
+- Full architecture, codemap, CLI manual, harness manual, or feature registry.
+- Generated inventories, sample reports, audit narratives, or static data JSON.
+- Exhaustive feature lists, completion claims, or unverified benchmark/results
+  claims.
