@@ -1,0 +1,1008 @@
+{
+  "registry_version": "1.0",
+  "updated_at": "2026-05-07",
+  "source": {
+    "generated_by": "docs/harness bootstrap task",
+    "inputs": [
+      "codebase_mapper report",
+      "feature_inventory_agent report",
+      "test_inventory_agent report",
+      "docs_inventory_agent report",
+      "harness_planner report",
+      "sequential coordinator inspection of pyproject.toml, README.md, contract2agent/cli.py, docs, tests, examples, scripts, and CI files"
+    ],
+    "notes": "This registry preserves historical evidence where visible. Tests were not run during the 2026-05-07 docs/harness bootstrap task."
+  },
+  "status_policy": {
+    "default_for_inferred": "needs_verification",
+    "verified_pass_requires": "Concrete evaluator, test, command, or artifact evidence tied to the feature. Historical evidence must keep its date and must not be presented as a fresh validation run.",
+    "unknown_policy": "Unknown or uninspected features must not be marked failed. Use needs_verification, inferred, implemented_pending_evaluation, or blocked with explicit notes.",
+    "failed_policy": "This registry intentionally has no failed default status. A failure claim requires evaluator/test evidence and should be recorded in progress or handoff before changing feature status."
+  },
+  "features": [
+    {
+      "id": "cli_c2a_entrypoint",
+      "name": "c2a CLI and legacy agentdoctor alias",
+      "summary": "The package exposes the primary c2a console script and a legacy agentdoctor alias that dispatch to contract2agent.cli:main.",
+      "visibility": "developer_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "pyproject.toml",
+          "detail": "[project.scripts] declares c2a and agentdoctor."
+        },
+        {
+          "kind": "source",
+          "path": "contract2agent/cli.py",
+          "detail": "CLI main dispatches to Typer or argparse fallback."
+        },
+        {
+          "kind": "historical_record",
+          "path": "docs/harness/PROGRESS.md",
+          "detail": "Records python -m pytest passing 355 tests on 2026-05-06.",
+          "date": "2026-05-06"
+        }
+      ],
+      "tests": [
+        "tests/test_docs_site.py",
+        "tests/test_contract2agent.py"
+      ],
+      "docs": [
+        "README.md",
+        "docs/cli.md",
+        "docs/CODEMAP.md"
+      ],
+      "risks": [
+        "The legacy alias is compatibility surface; do not rename casually."
+      ],
+      "notes": "Verified status rests on dated repository evidence, not a test run from the 2026-05-07 bootstrap task.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "contract_scaffold_generation",
+      "name": "Requirement parsing and demo/scaffold generation",
+      "summary": "Requirement text and contract files can be turned into generated demo or scaffold projects.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/parser.py, contract2agent/compiler.py, contract2agent/generator.py",
+          "detail": "Modules implement parsing, compilation, and template rendering."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_contract2agent.py",
+          "detail": "Covers parser, demo generation, counterexamples, and CLI flows."
+        },
+        {
+          "kind": "historical_record",
+          "path": "docs/harness/PROGRESS.md",
+          "detail": "Records full pytest pass on 2026-05-06.",
+          "date": "2026-05-06"
+        }
+      ],
+      "tests": [
+        "tests/test_contract2agent.py"
+      ],
+      "docs": [
+        "README.md",
+        "docs/cli.md",
+        "contract2agent/README.md"
+      ],
+      "risks": [
+        "Template changes affect generated project behavior and should use focused tests."
+      ],
+      "notes": "Preserve legacy scaffold behavior unless a sprint contract explicitly changes it.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "contract_trace_checking",
+      "name": "Contract trace validation",
+      "summary": "Contracts can be checked against trace JSON for forbidden tools, ordering, required outputs, limits, and refusal behavior.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/checker.py",
+          "detail": "Implements trace checking and CheckResult."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_contract2agent.py",
+          "detail": "Covers pass/fail trace behavior and CLI checks."
+        },
+        {
+          "kind": "test",
+          "path": "tests/fixtures/golden",
+          "detail": "Golden diagnosis fixtures exercise expected failure categories."
+        }
+      ],
+      "tests": [
+        "tests/test_contract2agent.py",
+        "tests/test_golden_diagnosis.py"
+      ],
+      "docs": [
+        "docs/cli.md",
+        "docs/CODEMAP.md"
+      ],
+      "risks": [
+        "Weakening checker rules can change many diagnosis and golden outcomes."
+      ],
+      "notes": "Historical full-suite pass recorded on 2026-05-06.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "diagnosis_reports",
+      "name": "Trace diagnosis, why reports, and regression trace suggestions",
+      "summary": "Diagnosis flows produce structured issues, Markdown/YAML reports, why explanations, and suggested regression traces.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/diagnosis.py, contract2agent/diagnosis_schema.py",
+          "detail": "Implements diagnosis schema, reports, why output, and regression trace helpers."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_diagnosis_schema.py",
+          "detail": "Covers diagnosis issue protocol and report rendering."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_report_rendering.py",
+          "detail": "Covers Markdown/JSON report structure."
+        }
+      ],
+      "tests": [
+        "tests/test_contract2agent.py",
+        "tests/test_diagnosis_schema.py",
+        "tests/test_report_rendering.py"
+      ],
+      "docs": [
+        "docs/reports.md",
+        "docs/cli.md"
+      ],
+      "risks": [
+        "Large legacy modules need careful scoped edits."
+      ],
+      "notes": "Verified status relies on dated test evidence, not this docs-only task.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "quick_deep_auto_diagnosis",
+      "name": "Quick, deep, and auto diagnostic modes",
+      "summary": "Diagnostic modes run bounded smoke, multi-round, and auto workflows with review policies and confidence estimates.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/diagnostic_modes.py",
+          "detail": "Implements quick, deep, auto, review policies, safety checks, and reports."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_diagnostic_modes.py",
+          "detail": "Covers mode behavior, clean errors, auto safety, and rollback."
+        }
+      ],
+      "tests": [
+        "tests/test_diagnostic_modes.py"
+      ],
+      "docs": [
+        "docs/quick.md",
+        "docs/deep.md",
+        "docs/auto.md",
+        "docs/cli.md"
+      ],
+      "risks": [
+        "Auto mode safety boundaries and write allowlists are critical."
+      ],
+      "notes": "Do not expand auto behavior without a sprint contract and focused tests.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "baseline_save_compare",
+      "name": "Diagnostic baseline snapshots and comparison",
+      "summary": "Diagnostic runs can save baselines, hashes, snapshots, and comparisons for regression context.",
+      "visibility": "developer_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/baseline.py",
+          "detail": "Implements baseline save, load, hash, and comparison."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_baseline.py",
+          "detail": "Covers snapshots, comparisons, corrupt baselines, and CLI parsing."
+        }
+      ],
+      "tests": [
+        "tests/test_baseline.py"
+      ],
+      "docs": [
+        "docs/baselines.md",
+        "docs/cli.md"
+      ],
+      "risks": [
+        "Runtime .agentdoctor paths are compatibility storage paths, not project identity."
+      ],
+      "notes": "Historical full-suite evidence recorded on 2026-05-06.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "triage_planning",
+      "name": "Static triage and recommended next mode",
+      "summary": "Static triage detects configuration, risks, coverage gaps, baseline state, and recommended next command.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/triage",
+          "detail": "Implements static discovery, classification, coverage, risk, planning, and reports."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_triage.py",
+          "detail": "Covers triage CLI, path safety, risk mapping, recommendations, and secret exclusion."
+        }
+      ],
+      "tests": [
+        "tests/test_triage.py"
+      ],
+      "docs": [
+        "docs/triage.md",
+        "contract2agent/triage/README.md"
+      ],
+      "risks": [
+        "Triage is static and must not be described as running agents or tools."
+      ],
+      "notes": "No fresh triage command was run in this bootstrap task.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "cost_estimate",
+      "name": "Static diagnostic time and cost estimate",
+      "summary": "Cost estimate reports model likely diagnostic cost, time, tool calls, review burden, and guardrails without live execution.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/cost_estimate",
+          "detail": "Implements static estimate models, rules, guardrails, and reports."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_cost_estimate.py",
+          "detail": "Covers estimates, budgets, guardrails, reports, and secret exclusion."
+        }
+      ],
+      "tests": [
+        "tests/test_cost_estimate.py"
+      ],
+      "docs": [
+        "docs/time-cost.md",
+        "contract2agent/cost_estimate/README.md"
+      ],
+      "risks": [
+        "Do not report estimates as measured runtime."
+      ],
+      "notes": "Estimate behavior is static by design.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "patch_preview",
+      "name": "Preview-only patch proposals",
+      "summary": "Patch preview groups findings and writes proposal reports and diffs without applying patches by default.",
+      "visibility": "developer_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/patch_preview",
+          "detail": "Implements preview models, strategy routing, allowlists, reports, and diffs."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_patch_preview.py",
+          "detail": "Covers preview-only behavior, allowlists, safety, output files, and no auto-apply marking."
+        }
+      ],
+      "tests": [
+        "tests/test_patch_preview.py"
+      ],
+      "docs": [
+        "docs/patch-preview.md",
+        "contract2agent/patch_preview/README.md"
+      ],
+      "risks": [
+        "Never imply patch-preview directly applies changes unless future implementation and tests add it."
+      ],
+      "notes": "Preview-only boundary is intentional.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "agent_profile_evaluation",
+      "name": "Generalized agent profile evaluation",
+      "summary": "Agent profiles are classified, matched to eval categories, scored preliminarily, and rendered with evidence basis and limitations.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation",
+          "detail": "Implements schemas, classification, evidence resolution, scoring, prediction, and reports."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_agent_evaluation_framework.py",
+          "detail": "Covers schemas, classification invariants, evidence, scoring, prediction, benchmark discipline, and reports."
+        }
+      ],
+      "tests": [
+        "tests/test_agent_evaluation_framework.py"
+      ],
+      "docs": [
+        "README.md",
+        "docs/PROJECT_CONTEXT.md",
+        "docs/ARCHITECTURE.md",
+        "contract2agent/evaluation/README.md"
+      ],
+      "risks": [
+        "Declared capability alone must not become high-confidence performance evidence."
+      ],
+      "notes": "Broad pre-runtime evaluation is not a universal judge.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "contextual_benchmark_references",
+      "name": "Benchmark and reference evidence discipline",
+      "summary": "Benchmark and methodology references are contextual unless a comparable observed or imported result is linked.",
+      "visibility": "developer_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation/evidence.py",
+          "detail": "Separates observed, imported, reference, declared-only, and missing evidence."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_agent_evaluation_framework.py",
+          "detail": "Covers benchmark references not becoming direct scores."
+        },
+        {
+          "kind": "doc",
+          "path": "docs/data/agent_eval/source_references.json",
+          "detail": "Static reference metadata used for context."
+        }
+      ],
+      "tests": [
+        "tests/test_agent_evaluation_framework.py",
+        "tests/test_file_reading_eval.py"
+      ],
+      "docs": [
+        "README.md",
+        "docs/PROJECT_CONTEXT.md",
+        "docs/file-reading-eval/README.md"
+      ],
+      "risks": [
+        "Do not turn public benchmark references into target-agent scores."
+      ],
+      "notes": "No external web research was performed in this bootstrap task.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "eval_agent_cli",
+      "name": "c2a eval-agent Markdown and JSON reports",
+      "summary": "The eval-agent command renders profile-based evaluation reports in Markdown or JSON using optional results and benchmark references.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/cli.py",
+          "detail": "Implements _cmd_eval_agent and CLI registration."
+        },
+        {
+          "kind": "example",
+          "path": "examples/agent_eval",
+          "detail": "Contains sample profiles, benchmark references, and experiment results."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_agent_evaluation_framework.py",
+          "detail": "Includes eval-agent CLI smoke coverage."
+        }
+      ],
+      "tests": [
+        "tests/test_agent_evaluation_framework.py"
+      ],
+      "docs": [
+        "README.md",
+        "docs/CODEMAP.md"
+      ],
+      "risks": [
+        "Output must keep limitations and missing evidence visible."
+      ],
+      "notes": "No eval-agent command was run in the 2026-05-07 bootstrap task.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "file_eval_corpus_tasks",
+      "name": "File-reading corpus import and task validation",
+      "summary": "File-reading eval can import local corpora, build/load task JSONL, and validate evidence spans and file boundaries.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation/file_reading/corpus.py, contract2agent/evaluation/file_reading/tasks.py",
+          "detail": "Implements corpus import, manifest creation, task loading, and validation."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_eval.py",
+          "detail": "Covers corpus, task, span, and forbidden-file validation."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_eval.py",
+        "tests/test_file_reading_docs_examples.py"
+      ],
+      "docs": [
+        "docs/file-reading-eval/README.md",
+        "docs/file-reading-eval/cli-guide.md"
+      ],
+      "risks": [
+        "Corpus import must not read secrets or escape approved roots."
+      ],
+      "notes": "File-reading modules are present, so file-reading eval architecture rules apply.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "file_eval_runner",
+      "name": "Black-box file-reading agent runner",
+      "summary": "The file-eval runner executes a target command with task input/output placeholders and captures run artifacts.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation/file_reading/runner.py",
+          "detail": "Implements black-box target command runs and artifact capture."
+        },
+        {
+          "kind": "example",
+          "path": "examples/file_reading_eval/agents",
+          "detail": "Contains dummy readers for local smoke and docs examples."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_eval.py",
+          "detail": "Covers dummy target agent run and task budget behavior."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_eval.py"
+      ],
+      "docs": [
+        "docs/file-reading-eval/sample-run.md",
+        "examples/file_reading_eval/README.md"
+      ],
+      "risks": [
+        "Target commands are local runtime behavior and must stay bounded by explicit inputs and budgets."
+      ],
+      "notes": "No file-eval run was executed in the 2026-05-07 bootstrap task.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "file_eval_deterministic_grading",
+      "name": "Deterministic file-reading graders",
+      "summary": "Deterministic graders evaluate answer correctness, citation grounding, file selection, abstention, schema compliance, and forbidden-file behavior.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation/file_reading/graders.py",
+          "detail": "Implements deterministic grading."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_eval.py",
+          "detail": "Covers citation spans, recall/precision, forbidden files, abstention, and output schema validation."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_eval.py",
+        "tests/test_file_reading_docs_examples.py"
+      ],
+      "docs": [
+        "docs/file-reading-eval/report-examples.md"
+      ],
+      "risks": [
+        "Optional judges must not replace deterministic scores."
+      ],
+      "notes": "Default file-reading grading is local and API-free.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "file_eval_reports",
+      "name": "File-reading profile and run reports",
+      "summary": "File-reading reports render profile-only readiness or observed run results while keeping limitations explicit.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation/file_reading/reports.py",
+          "detail": "Implements Markdown/JSON report rendering."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_eval.py",
+          "detail": "Covers run reports and profile-only no-observed-score message."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_eval.py"
+      ],
+      "docs": [
+        "docs/file-reading-eval/report-examples.md"
+      ],
+      "risks": [
+        "Profile-only reports must not claim observed reading performance."
+      ],
+      "notes": "Observed performance requires a documented file-eval run artifact.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "file_eval_reference_compare",
+      "name": "File-reading reference comparison",
+      "summary": "File-reading reference comparisons compute deltas only when task pack, scoring method, environment, and conditions are compatible.",
+      "visibility": "developer_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation/file_reading/compare.py, contract2agent/evaluation/file_reading/references.py",
+          "detail": "Implements reference metadata and compatibility-aware comparison."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_eval.py",
+          "detail": "Covers contextual-only incompatible references."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_eval.py"
+      ],
+      "docs": [
+        "docs/file-reading-eval/README.md",
+        "docs/file-reading-eval/report-examples.md"
+      ],
+      "risks": [
+        "Incompatible public benchmark references must stay contextual."
+      ],
+      "notes": "No public benchmark claim is added by this registry entry.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "file_eval_optional_llm_judge",
+      "name": "Optional LLM and command judge support",
+      "summary": "Optional judge support can supplement deterministic file-reading grades when explicitly configured, budgeted, and separated from deterministic scores.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation/file_reading/llm_judge.py",
+          "detail": "Implements command and OpenAI-compatible judge support, budgets, cache, and redaction."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_llm_judge.py",
+          "detail": "Covers explicit opt-in, no-API deterministic mode, key handling, cache, compact inputs, and sanitization."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_llm_judge.py"
+      ],
+      "docs": [
+        "docs/file-reading-eval/cli-guide.md",
+        "examples/file_reading_eval/configs/llm_judge.example.json"
+      ],
+      "risks": [
+        "API keys must never be written to reports, caches, browser code, or committed config."
+      ],
+      "notes": "No LLM API call was made in this bootstrap task.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "file_eval_cli_experience",
+      "name": "c2a file-eval help, doctor, plain/json/no-color modes",
+      "summary": "File-eval CLI includes workflow help topics, doctor checks, and script-friendly output modes.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/evaluation/file_reading/cli.py, contract2agent/evaluation/file_reading/help.py",
+          "detail": "Registers file-eval commands and help topics."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_llm_judge.py",
+          "detail": "Covers help topics, doctor JSON/plain modes, and output behavior."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_llm_judge.py",
+        "tests/test_file_reading_docs_examples.py"
+      ],
+      "docs": [
+        "docs/file-reading-eval/cli-guide.md",
+        "docs/CODEMAP.md"
+      ],
+      "risks": [
+        "CLI docs must match actual command names."
+      ],
+      "notes": "Codemap now lists the source-implemented profile-only command name.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "static_agent_eval_demo",
+      "name": "Static browser agent-eval demo",
+      "summary": "The agent-eval GitHub Pages demo is static, browser-local, bilingual, and exports Markdown/JSON without backend calls.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "docs/agent-eval/index.html, docs/assets/agent-eval.js",
+          "detail": "Static browser demo files are present."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_docs_site.py",
+          "detail": "Covers static demo files, inputs, i18n, sample loading, source references, and static constraints."
+        }
+      ],
+      "tests": [
+        "tests/test_docs_site.py"
+      ],
+      "docs": [
+        "README.md",
+        "docs/index.md"
+      ],
+      "risks": [
+        "No backend, API calls, private keys, live benchmark fetches, or arbitrary experiment runners on GitHub Pages."
+      ],
+      "notes": "No browser-run tests were added or run in this task.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "legacy_contract_playground",
+      "name": "Static contract-dispute playground",
+      "summary": "The legacy browser-side contract-dispute playground remains available as a static specialized demo.",
+      "visibility": "user_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "docs/playground/index.html, docs/assets/app.js",
+          "detail": "Legacy static demo files are present."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_docs_site.py",
+          "detail": "Covers playground assets, structured output, exports, and case-specific static behavior."
+        }
+      ],
+      "tests": [
+        "tests/test_docs_site.py"
+      ],
+      "docs": [
+        "README.md",
+        "docs/demo.md"
+      ],
+      "risks": [
+        "Legacy demo should remain static and not become the main project identity."
+      ],
+      "notes": "Preserved as a legacy specialized demo.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "file_eval_examples_docs",
+      "name": "File-reading examples and docs alignment",
+      "summary": "Committed file-reading examples, docs, sample outputs, expected reports, and fixture agents are checked for consistency and safety.",
+      "visibility": "developer_visible",
+      "status": "verified_pass",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "example",
+          "path": "examples/file_reading_eval",
+          "detail": "Contains corpus, tasks, dummy agents, target outputs, profiles, references, and expected report shapes."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_docs_examples.py",
+          "detail": "Covers docs/examples alignment, safety, sample run walkthrough, and deterministic grader fixtures."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_docs_examples.py"
+      ],
+      "docs": [
+        "docs/file-reading-eval/README.md",
+        "examples/file_reading_eval/README.md"
+      ],
+      "risks": [
+        "Example reports are sample/synthetic unless tied to a documented run."
+      ],
+      "notes": "Historical test evidence exists; this task did not rerun docs example tests.",
+      "last_updated": "2026-05-07",
+      "last_verified": "2026-05-06"
+    },
+    {
+      "id": "harness_agent_first_workflow",
+      "name": "Repo-local agent-first development harness",
+      "summary": "Harness docs, progress, gates, eval matrix, sprint template, runbook, and registry coordinate future scoped agent work.",
+      "visibility": "developer_visible",
+      "status": "implemented_pending_evaluation",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "doc",
+          "path": "docs/harness",
+          "detail": "Harness docs and registry files are present and updated for the bootstrap task."
+        },
+        {
+          "kind": "historical_record",
+          "path": "docs/harness/PROGRESS.md",
+          "detail": "Records harness doctor, docs validation, docs links, MkDocs, compileall, and pytest passing on 2026-05-06.",
+          "date": "2026-05-06"
+        },
+        {
+          "kind": "missing_evidence",
+          "path": "docs/harness/PROGRESS.md",
+          "detail": "The 2026-05-07 bootstrap task did not run harness validator, docs link check, MkDocs, or pytest."
+        }
+      ],
+      "tests": [
+        "python scripts/harness/validate_docs.py",
+        "python scripts/check_docs_links.py",
+        "python -m mkdocs build --strict",
+        "python -m pytest"
+      ],
+      "docs": [
+        "docs/harness/README.md",
+        "docs/harness/QUALITY_GATES.md",
+        "docs/harness/EVAL_MATRIX.md",
+        "docs/harness/RUNBOOK.md",
+        "docs/harness/SPRINT_CONTRACT_TEMPLATE.md"
+      ],
+      "risks": [
+        "Current docs changed after historical validation; rerun relevant gates before restoring verified_pass.",
+        "Pre-existing forbidden dirty files remain outside this task scope."
+      ],
+      "notes": "Downgraded from historical verified_pass to implemented_pending_evaluation because this task updates harness docs but only validates JSON.",
+      "last_updated": "2026-05-07",
+      "last_verified": null
+    },
+    {
+      "id": "codex_project_agents",
+      "name": "Project-scoped Codex agent configuration",
+      "summary": "Project-local Codex configuration and role files define intended read-only and write-scoped agent behavior.",
+      "visibility": "developer_visible",
+      "status": "needs_verification",
+      "confidence": "medium",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": ".codex/config.toml, .codex/agents",
+          "detail": "Configuration files are present in the worktree."
+        },
+        {
+          "kind": "missing_evidence",
+          "path": "docs/AGENT_HANDOFF.md",
+          "detail": "Runtime support should be verified before marking this feature verified."
+        }
+      ],
+      "tests": [],
+      "docs": [
+        "docs/AGENT_HANDOFF.md",
+        "docs/harness/README.md"
+      ],
+      "risks": [
+        "Runtime behavior depends on Codex support and was not verified."
+      ],
+      "notes": "Keep needs_verification until an actual Codex workflow or static validation evidence is recorded.",
+      "last_updated": "2026-05-07",
+      "last_verified": null
+    },
+    {
+      "id": "contract_counterexamples",
+      "name": "Deterministic counterexample trace generation",
+      "summary": "Counterexample commands generate deterministic trace cases and manifests for contract validation.",
+      "visibility": "user_visible",
+      "status": "needs_verification",
+      "confidence": "medium",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/counterexamples.py",
+          "detail": "Implements CounterexampleCase and generation logic."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_contract2agent.py",
+          "detail": "Contains counterexample tests, but this registry row is split out from a broader verified feature."
+        }
+      ],
+      "tests": [
+        "tests/test_contract2agent.py"
+      ],
+      "docs": [
+        "docs/cli.md"
+      ],
+      "risks": [
+        "Split-out feature row has not been independently evaluated as a registry item."
+      ],
+      "notes": "Defaulting to needs_verification for a newly split-out feature candidate.",
+      "last_updated": "2026-05-07",
+      "last_verified": null
+    },
+    {
+      "id": "restrictions_capabilities_cli",
+      "name": "Restrictions and capability evidence reporting",
+      "summary": "CLI commands summarize forbidden restrictions and capability evidence from contracts and optional eval reports.",
+      "visibility": "user_visible",
+      "status": "needs_verification",
+      "confidence": "medium",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/capabilities.py, contract2agent/cli.py",
+          "detail": "Implements capability report and restrictions CLI handling."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_contract2agent.py",
+          "detail": "Contains capability command tests, but this row is newly split out."
+        }
+      ],
+      "tests": [
+        "tests/test_contract2agent.py"
+      ],
+      "docs": [
+        "docs/cli.md"
+      ],
+      "risks": [
+        "Capability evidence status must not be upgraded without evaluator evidence."
+      ],
+      "notes": "Needs focused verification before verified_pass as a separate feature.",
+      "last_updated": "2026-05-07",
+      "last_verified": null
+    },
+    {
+      "id": "path_secret_safety",
+      "name": "Path containment, secret filtering, and generated-artifact exclusions",
+      "summary": "Safety helpers and subsystem checks prevent path escapes, secret leakage, and accidental generated artifact inclusion.",
+      "visibility": "internal",
+      "status": "needs_verification",
+      "confidence": "high",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": "contract2agent/path_safety.py",
+          "detail": "Provides path containment helpers."
+        },
+        {
+          "kind": "test",
+          "path": "tests/test_file_reading_llm_judge.py, tests/test_triage.py, tests/test_patch_preview.py",
+          "detail": "Tests reference sanitization, secret exclusion, and path allowlists."
+        }
+      ],
+      "tests": [
+        "tests/test_file_reading_llm_judge.py",
+        "tests/test_triage.py",
+        "tests/test_patch_preview.py"
+      ],
+      "docs": [
+        "docs/PROJECT_CONTEXT.md",
+        "docs/GOLDEN_PRINCIPLES.md"
+      ],
+      "risks": [
+        "This is a cross-cutting safety boundary and should not be weakened."
+      ],
+      "notes": "Tracked as an internal capability; use focused evidence before promoting to verified_pass.",
+      "last_updated": "2026-05-07",
+      "last_verified": null
+    },
+    {
+      "id": "docs_ci_pages_workflows",
+      "name": "CI and docs deployment workflows",
+      "summary": "GitHub Actions workflows exist for pytest/JS syntax/whitespace checks and MkDocs Pages deployment.",
+      "visibility": "developer_visible",
+      "status": "needs_verification",
+      "confidence": "medium",
+      "evidence": [
+        {
+          "kind": "source",
+          "path": ".github/workflows/ci.yml, .github/workflows/docs.yml",
+          "detail": "Workflows define CI and docs deployment jobs."
+        },
+        {
+          "kind": "missing_evidence",
+          "path": ".github/workflows",
+          "detail": "No current GitHub Actions run status was inspected in this task."
+        }
+      ],
+      "tests": [
+        "Current GitHub Actions run"
+      ],
+      "docs": [
+        "docs/development.md"
+      ],
+      "risks": [
+        "Workflow config presence is not proof of current green CI."
+      ],
+      "notes": "Keep needs_verification until a current CI result is checked.",
+      "last_updated": "2026-05-07",
+      "last_verified": null
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contract2agent.local/docs/harness/FEATURE_REGISTRY.schema.json",
+  "title": "Contract2Agent Feature Registry",
+  "description": "Evidence-aware registry for inferred, implemented, verified, blocked, and deprecated Contract2Agent features.",
+  "type": "object",
+  "required": [
+    "registry_version",
+    "updated_at",
+    "source",
+    "status_policy",
+    "features"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "registry_version": {
+      "type": "string",
+      "pattern": "^1\\.0$"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "source": {
+      "type": "object",
+      "required": ["generated_by", "inputs"],
+      "additionalProperties": false,
+      "properties": {
+        "generated_by": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "status_policy": {
+      "type": "object",
+      "required": [
+        "default_for_inferred",
+        "verified_pass_requires",
+        "unknown_policy",
+        "failed_policy"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "default_for_inferred": {
+          "type": "string",
+          "const": "needs_verification"
+        },
+        "verified_pass_requires": {
+          "type": "string"
+        },
+        "unknown_policy": {
+          "type": "string"
+        },
+        "failed_policy": {
+          "type": "string"
+        }
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/feature"
+      }
+    }
+  },
+  "$defs": {
+    "feature": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "summary",
+        "visibility",
+        "status",
+        "confidence",
+        "evidence",
+        "tests",
+        "docs",
+        "risks",
+        "notes",
+        "last_updated"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "user_visible",
+            "developer_visible",
+            "internal"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "inferred",
+            "needs_verification",
+            "implemented_pending_evaluation",
+            "verified_pass",
+            "blocked",
+            "deprecated"
+          ]
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "unknown"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_item"
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "docs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "string"
+        },
+        "last_updated": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "last_verified": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      }
+    },
+    "evidence_item": {
+      "type": "object",
+      "required": ["kind", "path", "detail"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "source",
+            "test",
+            "command",
+            "doc",
+            "example",
+            "artifact",
+            "historical_record",
+            "manual_annotation",
+            "missing_evidence",
+            "inferred"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      }
+    }
+  }
+}
