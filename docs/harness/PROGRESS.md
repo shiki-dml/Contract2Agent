@@ -155,3 +155,66 @@ on 2026-05-06. No tests were run in this 2026-05-07 task.
 
 Run an evaluator pass over the current docs/harness bootstrap, then run the
 docs/harness gates that the environment allows before upgrading harness status.
+
+## 2026-05-09 - ECC-Inspired Codex Tooling Organization
+
+### Scope
+
+- User request: adapt useful organization patterns from `affaan-m/everything-claude-code` for this repository's agent, skill, and MCP setup.
+- Allowed write set by request: project-local Codex configuration, project-local skills, and harness state records needed to keep evidence aligned.
+- Out of scope: production package code, tests, examples, dependency installation, enabled networked MCP startup, Git staging/commit/reset/delete/rename, and verified feature status upgrades.
+
+### Baseline Inspection
+
+| Command | Result |
+| --- | --- |
+| `git status --short` | Initial sandboxed attempt failed with `windows sandbox: setup refresh failed`; escalated retry returned clean output. |
+| `git branch --show-current` | `main` |
+| `docs/AGENT_HANDOFF.md`, `docs/harness/PROGRESS.md`, `docs/ARCHITECTURE.md`, `docs/CODEMAP.md` | Read before edits. |
+| `.codex/config.toml`, `.codex/agents`, `.agents/skills` | Existing project-local Codex config, agent roles, and skills inspected before edits. |
+
+### Files Updated
+
+- `.codex/config.toml`
+- `.agents/skills/codex-tooling-orchestrator/SKILL.md`
+- `.agents/skills/codex-tooling-orchestrator/agents/openai.yaml`
+- `docs/harness/feature_registry.json`
+- `docs/harness/PROGRESS.md`
+- `docs/AGENT_HANDOFF.md`
+
+### What Changed
+
+- Reworked `.codex/config.toml` into an explicit project-scoped Codex config with schema pointer, local role references, skill settings, conservative multi-agent feature flags, and disabled optional MCP candidates.
+- Added optional disabled MCP entries for `context7`, `github`, `playwright`, `sequential_thinking`, and `memory`; no server was enabled or installed.
+- Added the `codex-tooling-orchestrator` skill to guide future agents on role selection, skill selection, MCP use, enablement checks, and evidence boundaries.
+- Updated the `codex_project_agents` registry entry with source/command evidence while keeping status at `needs_verification`.
+
+### Validation Log
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `python -c "import pathlib, tomllib; tomllib.loads(pathlib.Path('.codex/config.toml').read_text(encoding='utf-8')); print('toml ok')"` | Passed | Confirms `.codex/config.toml` is valid TOML. |
+| `python D:\DevData\.codex\skills\.system\skill-creator\scripts\quick_validate.py .agents\skills\codex-tooling-orchestrator` | Passed | Skill frontmatter and naming validated. |
+| `codex --help` | Passed | Codex CLI is available. |
+| `codex mcp --help` | Passed | MCP management subcommand is available. |
+| `codex mcp list` | Passed | Parsed configured MCP entries and reported all five as `disabled`; no MCP server startup was attempted. |
+| `git status --short` | Ran | Final status shows modified `.codex/config.toml`, `docs/AGENT_HANDOFF.md`, `docs/harness/PROGRESS.md`, `docs/harness/feature_registry.json`, and untracked `.agents/skills/codex-tooling-orchestrator/`. |
+| `git diff --stat` | Ran | Final tracked diff covers `.codex/config.toml`, `docs/AGENT_HANDOFF.md`, `docs/harness/PROGRESS.md`, and `docs/harness/feature_registry.json`; untracked skill files are visible in status. |
+| `git diff --name-only` | Ran | Final tracked diff names `.codex/config.toml`, `docs/AGENT_HANDOFF.md`, `docs/harness/PROGRESS.md`, and `docs/harness/feature_registry.json`. |
+| `python -c "import json, pathlib; json.loads(pathlib.Path('docs/harness/feature_registry.json').read_text(encoding='utf-8')); print('feature_registry json ok')"` | Passed | Confirms updated feature registry is valid JSON. |
+| `python scripts/harness/validate_docs.py` | Passed | Validated 16 required docs, 10 module READMEs, AGENTS.md length, and feature registry shape. |
+| `python -m pytest` | Not run | No production Python behavior or tests changed. |
+| `python -m mkdocs build --strict` | Not run | No MkDocs navigation or site content changed. |
+
+### Risks And Blockers
+
+- MCP servers are configured but disabled. Enabling them may require network access, `npx` package downloads, and credentials.
+- `codex mcp list` validates that Codex can parse/list the MCP entries, not that the servers start successfully.
+- Fresh-session skill discovery and custom agent dispatch were not exercised, so `codex_project_agents` remains `needs_verification`.
+- No evaluator pass was run after this configuration change.
+
+### Next Step
+
+Run an evaluator pass for the Codex tooling configuration, then enable and test
+only the specific MCP server needed for a concrete task with explicit network
+and credential approval.

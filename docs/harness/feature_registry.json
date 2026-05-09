@@ -853,24 +853,45 @@
         {
           "kind": "source",
           "path": ".codex/config.toml, .codex/agents",
-          "detail": "Configuration files are present in the worktree."
+          "detail": "Configuration files are present in the worktree; config now explicitly lists local role files and disabled optional MCP candidates.",
+          "date": "2026-05-09"
+        },
+        {
+          "kind": "source",
+          "path": ".agents/skills/codex-tooling-orchestrator/SKILL.md",
+          "detail": "Project-local skill documents how future agents should coordinate local roles, skills, and optional MCP servers without weakening evidence discipline.",
+          "date": "2026-05-09"
+        },
+        {
+          "kind": "command",
+          "path": ".codex/config.toml",
+          "detail": "python -c \"import pathlib, tomllib; tomllib.loads(pathlib.Path('.codex/config.toml').read_text(encoding='utf-8')); print('toml ok')\" passed.",
+          "date": "2026-05-09"
+        },
+        {
+          "kind": "command",
+          "path": ".codex/config.toml",
+          "detail": "codex mcp list parsed the configured optional MCP servers and reported context7, github, memory, playwright, and sequential_thinking as disabled.",
+          "date": "2026-05-09"
         },
         {
           "kind": "missing_evidence",
           "path": "docs/AGENT_HANDOFF.md",
-          "detail": "Runtime support should be verified before marking this feature verified."
+          "detail": "Runtime agent role dispatch, skill discovery in a fresh Codex session, and enabled MCP server startup were not verified."
         }
       ],
       "tests": [],
       "docs": [
         "docs/AGENT_HANDOFF.md",
-        "docs/harness/README.md"
+        "docs/harness/README.md",
+        ".agents/skills/codex-tooling-orchestrator/SKILL.md"
       ],
       "risks": [
-        "Runtime behavior depends on Codex support and was not verified."
+        "Runtime behavior depends on Codex support and was not fully verified.",
+        "Optional MCP servers remain disabled and may require network access, package downloads, or credentials before use."
       ],
-      "notes": "Keep needs_verification until an actual Codex workflow or static validation evidence is recorded.",
-      "last_updated": "2026-05-07",
+      "notes": "Static TOML parsing and MCP listing evidence exists, but keep needs_verification until a fresh Codex workflow verifies role dispatch, skill discovery, and any enabled MCP server behavior.",
+      "last_updated": "2026-05-09",
       "last_verified": null
     },
     {

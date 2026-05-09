@@ -1,29 +1,125 @@
-# Project-scoped Codex harness configuration.
-# This file documents conservative defaults for future Codex sessions. The
-# repository docs remain the source of truth when tool support differs.
+#:schema https://developers.openai.com/codex/config-schema.json
+# Project-scoped Codex configuration for Contract2Agent.
+#
+# Source of truth:
+# - AGENTS.md
+# - docs/README.md
+# - docs/PROJECT_CONTEXT.md
+# - docs/ARCHITECTURE.md
+# - docs/CODEMAP.md
+# - docs/AGENT_HANDOFF.md
+# - docs/harness/PROGRESS.md
+# - docs/harness/feature_registry.json
+#
+# This file follows the "Everything Claude Code" pattern of making agents,
+# skills, and MCP candidates explicit, but keeps networked MCP servers disabled
+# until a user authorizes package downloads, credentials, and network access.
 
-[project]
-name = "Contract2Agent"
-source_of_truth = "docs/README.md"
-handoff = "docs/AGENT_HANDOFF.md"
-progress_log = "docs/harness/PROGRESS.md"
-feature_registry = "docs/harness/feature_registry.json"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+include_permissions_instructions = true
+include_environment_context = true
+include_apps_instructions = true
+project_doc_max_bytes = 32768
+project_doc_fallback_filenames = ["AGENTS.md"]
+project_root_markers = [".git", "AGENTS.md", "pyproject.toml"]
 
-[workflow]
-require_sprint_contract = true
-prefer_file_handoff = true
-incremental_work = true
-planner_generator_evaluator_separation = true
+[features]
+multi_agent = true
+skill_env_var_dependency_prompt = true
+skill_mcp_dependency_install = false
 
-[subagents]
-default_sandbox_mode = "read-only"
-write_sandbox_mode = "workspace-write"
-communication_paths = [
-  "docs/harness/",
-  "docs/AGENT_HANDOFF.md"
-]
+[skills]
+include_instructions = true
 
-[quality]
-default_test_command = "python -m pytest"
-docs_validation_command = "python scripts/harness/validate_docs.py"
-doctor_command = "bash scripts/harness/doctor.sh"
+[skills.bundled]
+enabled = true
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[agents.codebase_mapper]
+description = "Read-only repository mapping and ownership discovery for Contract2Agent."
+config_file = "agents/codebase-mapper.toml"
+
+[agents.docs_inventory_agent]
+description = "Read-only documentation inventory and stale-signal detection."
+config_file = "agents/docs-inventory-agent.toml"
+
+[agents.feature_inventory_agent]
+description = "Read-only feature candidate inventory with uncertainty preserved."
+config_file = "agents/feature-inventory-agent.toml"
+
+[agents.test_inventory_agent]
+description = "Read-only test layout, fixture, and coverage inventory."
+config_file = "agents/test-inventory-agent.toml"
+
+[agents.harness_planner]
+description = "Harness and sprint planning without implementation."
+config_file = "agents/harness-planner.toml"
+
+[agents.contract_generator]
+description = "Sprint contract writer for approved/proposed contracts only."
+config_file = "agents/contract-generator.toml"
+
+[agents.feature_generator]
+description = "Approved-contract-scoped implementation writer."
+config_file = "agents/feature-generator.toml"
+
+[agents.doc_gardener]
+description = "Approved documentation writer for docs and README surfaces."
+config_file = "agents/doc-gardener.toml"
+
+[agents.handoff_writer]
+description = "Handoff and progress artifact writer."
+config_file = "agents/handoff-writer.toml"
+
+[agents.bug_reviewer]
+description = "Read-only correctness and regression-risk reviewer."
+config_file = "agents/bug-reviewer.toml"
+
+[agents.evaluator]
+description = "Read-only PASS / FAIL / INCONCLUSIVE / BLOCKED evaluator."
+config_file = "agents/evaluator.toml"
+
+[mcp_servers.context7]
+enabled = false
+required = false
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@latest"]
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+
+[mcp_servers.github]
+enabled = false
+required = false
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github@latest"]
+env_vars = ["GITHUB_PERSONAL_ACCESS_TOKEN"]
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+
+[mcp_servers.playwright]
+enabled = false
+required = false
+command = "npx"
+args = ["-y", "@playwright/mcp@latest"]
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+
+[mcp_servers.sequential_thinking]
+enabled = false
+required = false
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]
+startup_timeout_sec = 30
+tool_timeout_sec = 60
+
+[mcp_servers.memory]
+enabled = false
+required = false
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-memory@latest"]
+startup_timeout_sec = 30
+tool_timeout_sec = 60

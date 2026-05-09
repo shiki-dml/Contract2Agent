@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Tooling Orchestrator"
+  short_description: "Coordinate Codex agents, skills, and MCP."
+  default_prompt: "Use this skill to coordinate Contract2Agent work with project-local agents, skills, and optional MCP servers while preserving evidence discipline."
