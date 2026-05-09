@@ -31,7 +31,6 @@ from contract2agent.evaluation.file_reading.runner import run_file_reading_eval
 from contract2agent.evaluation.file_reading.schema import to_dict
 from contract2agent.evaluation.file_reading.tasks import (
     build_smoke_tasks,
-    load_tasks_jsonl,
     validate_tasks,
     write_tasks_jsonl,
 )

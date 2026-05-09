@@ -25,7 +25,6 @@ from contract2agent.evaluation.file_reading.references import import_reference_s
 from contract2agent.evaluation.file_reading.runner import run_file_reading_eval
 from contract2agent.evaluation.file_reading.reports import write_run_report
 from contract2agent.evaluation.file_reading.schema import (
-    Citation,
     EvidenceSpan,
     FileAccessTrace,
     FileReadingAgentProfile,

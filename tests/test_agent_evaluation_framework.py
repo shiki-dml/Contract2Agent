@@ -12,7 +12,6 @@ from contract2agent.evaluation import (
     CapabilityClassifier,
     EvalCategoryRegistry,
     EvidenceResolver,
-    EvidenceSource,
     ExperimentSummary,
     ReportRenderer,
     ScoringEngine,

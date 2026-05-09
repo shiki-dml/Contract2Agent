@@ -24,7 +24,6 @@ from contract2agent.failure_taxonomy import (
     TimeCostSummary,
     auto_stop_reason,
     build_patch_proposal_from_strategy,
-    build_validation_plan,
     compare_failure_taxonomy,
     failure_type_counts,
     failure_type_severity_counts,

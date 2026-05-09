@@ -4,7 +4,7 @@ from collections import Counter, defaultdict
 from typing import Any
 
 from contract2agent.triage.models import AgentClassification, DetectedCapabilities, DetectedTool
-from contract2agent.triage.parsers import PromptSignals, RawProjectData
+from contract2agent.triage.parsers import RawProjectData
 
 
 HIGH_RISK_SIDE_EFFECTS = {"write_local", "external_write", "destructive", "unknown"}

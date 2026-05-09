@@ -9,7 +9,6 @@ from contract2agent.patch_preview.diff_builder import build_unified_diff
 from contract2agent.patch_preview.grouping import grouped_failure_summary, group_findings
 from contract2agent.patch_preview.loader import load_findings, normalize_failure_type
 from contract2agent.patch_preview.models import (
-    BaselineImpact,
     FindingGroup,
     LoadedFindings,
     PatchPreviewReport,

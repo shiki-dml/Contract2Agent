@@ -7,7 +7,6 @@ from typing import Any
 
 from contract2agent.checker import CheckResult, check_trace, is_refusal
 from contract2agent.diagnosis_schema import (
-    AffectedAgentPart,
     DiagnosisCategory,
     DiagnosisIssue,
     DiagnosisReport,

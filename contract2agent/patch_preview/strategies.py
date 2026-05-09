@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from contract2agent.patch_preview.models import FindingGroup
@@ -39,6 +40,27 @@ class FixStrategy:
     reviewer_notes: list[str]
 
 
+def _strategy(
+    strategy_id: str,
+    patch_type: str,
+    title: str,
+    *,
+    guidance_lines: Sequence[str] = (),
+    expected_effect: Sequence[str] = (),
+    regression_risks: Sequence[str] = (),
+    reviewer_notes: Sequence[str] = (),
+) -> FixStrategy:
+    return FixStrategy(
+        strategy_id=strategy_id,
+        patch_type=patch_type,
+        title=title,
+        guidance_lines=list(guidance_lines),
+        expected_effect=list(expected_effect),
+        regression_risks=list(regression_risks),
+        reviewer_notes=list(reviewer_notes),
+    )
+
+
 def select_strategy(
     group: FindingGroup,
     *,
@@ -48,11 +70,8 @@ def select_strategy(
     tool = group.tool_name or "the required tool"
 
     if "UNKNOWN" in types:
-        return FixStrategy(
-            strategy_id="review_unknown_failure",
-            patch_type="no_agent_patch_review_only",
-            title="Review unknown failure",
-            guidance_lines=[],
+        return _strategy(
+            "review_unknown_failure", "no_agent_patch_review_only", "Review unknown failure",
             expected_effect=["Better instrumentation should make the next diagnosis actionable."],
             regression_risks=["Changing agent behavior without a known cause can overfit or mask the real issue."],
             reviewer_notes=[
@@ -62,11 +81,8 @@ def select_strategy(
         )
 
     if "SCORER_UNCERTAIN" in types:
-        return FixStrategy(
-            strategy_id="review_scorer_uncertain",
-            patch_type="no_agent_patch_review_only",
-            title="Review scorer uncertainty",
-            guidance_lines=[],
+        return _strategy(
+            "review_scorer_uncertain", "no_agent_patch_review_only", "Review scorer uncertainty",
             expected_effect=["Human review can decide whether the eval or scorer should change."],
             regression_risks=["Patching the agent to satisfy an uncertain scorer can encode the scorer's ambiguity."],
             reviewer_notes=[
@@ -77,11 +93,8 @@ def select_strategy(
 
     if "REGRESSION" in types:
         if previous_patch_metadata:
-            return FixStrategy(
-                strategy_id="rollback_previous_patch",
-                patch_type="rollback_patch",
-                title="Rollback previous patch",
-                guidance_lines=[],
+            return _strategy(
+                "rollback_previous_patch", "rollback_patch", "Rollback previous patch",
                 expected_effect=["Restores behavior changed by the latest patch if the regression is linked to it."],
                 regression_risks=[
                     "Rollback may reintroduce the original failure that the previous patch addressed.",
@@ -89,21 +102,16 @@ def select_strategy(
                 ],
                 reviewer_notes=["Previous patch metadata exists, so rollback is preferred over stacking a new fix."],
             )
-        return FixStrategy(
-            strategy_id="review_regression_without_rollback",
-            patch_type="no_agent_patch_review_only",
-            title="Review regression",
-            guidance_lines=[],
+        return _strategy(
+            "review_regression_without_rollback", "no_agent_patch_review_only", "Review regression",
             expected_effect=["Reviewer can identify the changed behavior and choose rollback or a targeted fix."],
             regression_risks=["A new patch without rollback metadata can stack fixes and hide the original regression."],
             reviewer_notes=["No rollback metadata was found, so no rollback diff was generated."],
         )
 
     if "SAFETY_RISK" in types:
-        return FixStrategy(
-            strategy_id="fix_safety_permission_boundary",
-            patch_type="workflow_config_update",
-            title="Add safety and approval boundaries",
+        return _strategy(
+            "fix_safety_permission_boundary", "workflow_config_update", "Add safety and approval boundaries",
             guidance_lines=[
                 "Do not perform external writes, destructive actions, shell/code execution, or permission-sensitive actions unless the user explicitly requests the action and confirms it.",
                 "If a requested action could affect external systems, credentials, private data, or irreversible state, stop and ask for human approval before using the tool.",
@@ -121,10 +129,8 @@ def select_strategy(
         )
 
     if "FORBIDDEN_TOOL_CALL" in types:
-        return FixStrategy(
-            strategy_id="fix_forbidden_tool_policy",
-            patch_type="workflow_config_update",
-            title="Add forbidden tool policy",
+        return _strategy(
+            "fix_forbidden_tool_policy", "workflow_config_update", "Add forbidden tool policy",
             guidance_lines=[
                 "Do not call forbidden or side-effectful tools such as shell, file_writer, email_sender, calendar_creator, database_writer, or external write tools unless the user explicitly requests and confirms the action.",
                 "If a test or request conflicts with the forbidden-tool policy, follow the safety policy and report that the action is blocked.",
@@ -139,10 +145,8 @@ def select_strategy(
         )
 
     if {"TOOL_MISSING", "HALLUCINATION_RISK"}.issubset(types):
-        return FixStrategy(
-            strategy_id="fix_missing_tool_use_source_grounding",
-            patch_type="prompt_update",
-            title="Add source inspection and grounding rules",
+        return _strategy(
+            "fix_missing_tool_use_source_grounding", "prompt_update", "Add source inspection and grounding rules",
             guidance_lines=[
                 f"Before answering questions that depend on a provided document or source, call {tool} with the exact path or identifier supplied by the user.",
                 "Base factual claims only on tool-provided source content.",
@@ -160,10 +164,8 @@ def select_strategy(
         )
 
     if "OUTPUT_SCHEMA_ERROR" in types:
-        return FixStrategy(
-            strategy_id="fix_output_schema_strict_json",
-            patch_type="prompt_update",
-            title="Add strict schema-only output rule",
+        return _strategy(
+            "fix_output_schema_strict_json", "prompt_update", "Add strict schema-only output rule",
             guidance_lines=[
                 "Return only valid JSON matching the required schema.",
                 "Do not include Markdown fences, prose explanations, comments, trailing commas, or extra fields.",
@@ -181,10 +183,8 @@ def select_strategy(
         )
 
     if "OUTPUT_FORMAT_ERROR" in types:
-        return FixStrategy(
-            strategy_id="fix_output_format_template",
-            patch_type="prompt_update",
-            title="Add output template",
+        return _strategy(
+            "fix_output_format_template", "prompt_update", "Add output template",
             guidance_lines=[
                 "Use the required output format exactly.",
                 "When Markdown is requested, include the expected sections with stable headings and no extra top-level sections unless the task asks for them.",
@@ -202,11 +202,8 @@ def select_strategy(
 
     if "TOOL_MISSING" in types:
         if is_side_effect_tool(tool):
-            return FixStrategy(
-                strategy_id="review_missing_side_effect_tool",
-                patch_type="no_agent_patch_review_only",
-                title="Review side-effectful tool trigger",
-                guidance_lines=[],
+            return _strategy(
+                "review_missing_side_effect_tool", "no_agent_patch_review_only", "Review side-effectful tool trigger",
                 expected_effect=[
                     "Reviewer can decide whether the side-effectful tool should be used and under what approval rule.",
                 ],
@@ -218,10 +215,8 @@ def select_strategy(
                     "Add an approval-gated workflow rule before enabling this behavior.",
                 ],
             )
-        return FixStrategy(
-            strategy_id="fix_missing_tool_use",
-            patch_type="prompt_update",
-            title="Add tool-use trigger",
+        return _strategy(
+            "fix_missing_tool_use", "prompt_update", "Add tool-use trigger",
             guidance_lines=[
                 f"Before answering tasks that require information available through {tool}, call {tool} with the exact input supplied by the user.",
                 f"If the required input for {tool} is missing, ask for clarification instead of answering from assumptions.",
@@ -236,10 +231,8 @@ def select_strategy(
         )
 
     if "TOOL_ORDER_ERROR" in types:
-        return FixStrategy(
-            strategy_id="fix_tool_order_sequence",
-            patch_type="workflow_config_update",
-            title="Add required tool order",
+        return _strategy(
+            "fix_tool_order_sequence", "workflow_config_update", "Add required tool order",
             guidance_lines=[
                 "Follow the required tool order for multi-step tasks.",
                 "Call source/read tools before extraction or write tools.",
@@ -251,10 +244,8 @@ def select_strategy(
         )
 
     if "TOOL_ARGUMENT_ERROR" in types:
-        return FixStrategy(
-            strategy_id="fix_tool_arguments_and_error_handling",
-            patch_type="tool_description_update",
-            title="Clarify tool arguments",
+        return _strategy(
+            "fix_tool_arguments_and_error_handling", "tool_description_update", "Clarify tool arguments",
             guidance_lines=[
                 f"When calling {tool}, use argument values exactly from the user's request or validated prior tool output.",
                 "Do not invent file paths, identifiers, or permission-sensitive argument values.",
@@ -268,10 +259,8 @@ def select_strategy(
         )
 
     if "ERROR_HANDLING_MISSING" in types:
-        return FixStrategy(
-            strategy_id="fix_error_handling_fallbacks",
-            patch_type="prompt_update",
-            title="Add fallback and clarification rules",
+        return _strategy(
+            "fix_error_handling_fallbacks", "prompt_update", "Add fallback and clarification rules",
             guidance_lines=[
                 "If a required file path, identifier, or input is missing or invalid, do not infer the missing content.",
                 "Ask for a valid input or report the tool error clearly.",
@@ -283,10 +272,8 @@ def select_strategy(
         )
 
     if "HALLUCINATION_RISK" in types:
-        return FixStrategy(
-            strategy_id="fix_source_grounding",
-            patch_type="prompt_update",
-            title="Add source grounding",
+        return _strategy(
+            "fix_source_grounding", "prompt_update", "Add source grounding",
             guidance_lines=[
                 "When a document, retrieved source, or tool result is provided, base all factual claims on that source content.",
                 "Include evidence or citations when the task asks for factual conclusions.",
@@ -298,10 +285,8 @@ def select_strategy(
         )
 
     if "LOOP_RISK" in types:
-        return FixStrategy(
-            strategy_id="fix_loop_stop_conditions",
-            patch_type="agent_config_update",
-            title="Add loop stop conditions",
+        return _strategy(
+            "fix_loop_stop_conditions", "agent_config_update", "Add loop stop conditions",
             guidance_lines=[
                 "Do not call the same tool with the same arguments more than once unless new information is available.",
                 "If a tool fails twice with the same error, stop and report the issue.",
@@ -313,10 +298,8 @@ def select_strategy(
         )
 
     if "LOW_STABILITY" in types:
-        return FixStrategy(
-            strategy_id="fix_deterministic_behavior",
-            patch_type="prompt_update",
-            title="Add deterministic behavior rules",
+        return _strategy(
+            "fix_deterministic_behavior", "prompt_update", "Add deterministic behavior rules",
             guidance_lines=[
                 "Use a stable decision process for tool selection and output formatting.",
                 "When two valid output forms are possible, choose the one specified by the eval or task instructions.",
@@ -328,10 +311,8 @@ def select_strategy(
         )
 
     if "CONFIG_ERROR" in types:
-        return FixStrategy(
-            strategy_id="review_or_fix_simple_config",
-            patch_type="agent_config_update",
-            title="Review simple config issue",
+        return _strategy(
+            "review_or_fix_simple_config", "agent_config_update", "Review simple config issue",
             guidance_lines=[
                 "Add only unambiguous missing config values, paths, or tool descriptions.",
                 "If the intended value is unclear, stop and request human review instead of guessing.",
@@ -341,10 +322,8 @@ def select_strategy(
             reviewer_notes=["Auto-apply is disabled for config changes by default."],
         )
 
-    return FixStrategy(
-        strategy_id="fix_task_completion_criteria",
-        patch_type="prompt_update",
-        title="Add task completion criteria",
+    return _strategy(
+        "fix_task_completion_criteria", "prompt_update", "Add task completion criteria",
         guidance_lines=[
             "Before finalizing, check that every explicit user requirement has been addressed.",
             "If a required step cannot be completed, state what is missing and what action is needed.",
