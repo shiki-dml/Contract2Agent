@@ -44,6 +44,17 @@ def test_file_reading_sample_tasks_validate_against_imported_corpus(tmp_path: Pa
     assert validate_tasks(manifest, tasks) == []
 
 
+def test_file_reading_paper_tasks_validate_against_imported_corpus(tmp_path: Path) -> None:
+    manifest = import_local_corpus(
+        EXAMPLE_ROOT / "corpus",
+        tmp_path / "paper_corpus",
+        tmp_path / "manifest.json",
+    )
+    tasks = load_tasks_jsonl(EXAMPLE_ROOT / "tasks" / "paper_tasks.jsonl")
+
+    assert validate_tasks(manifest, tasks) == []
+
+
 def test_file_reading_sample_target_outputs_are_valid_json_outputs() -> None:
     for path in sorted((EXAMPLE_ROOT / "target_outputs").glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -140,6 +151,7 @@ def test_file_reading_docs_reference_existing_sample_files() -> None:
         "README.zh-CN.md",
         "cli-guide.md",
         "cli-guide.zh-CN.md",
+        "open-source-agent-references.md",
         "sample-run.md",
         "sample-run.zh-CN.md",
         "report-examples.md",
@@ -163,6 +175,10 @@ def test_file_reading_docs_reference_existing_sample_files() -> None:
         "examples/file_reading_eval/corpus/incident_notes.md",
         "examples/file_reading_eval/corpus/payment_terms.md",
         "examples/file_reading_eval/corpus/distractor_release_notes.md",
+        "examples/file_reading_eval/corpus/papers/qasper_paper_card.md",
+        "examples/file_reading_eval/corpus/papers/longbench_paper_card.md",
+        "examples/file_reading_eval/corpus/papers/blt_private_learning_card.md",
+        "examples/file_reading_eval/tasks/paper_tasks.jsonl",
         "examples/file_reading_eval/target_outputs/good_output.json",
         "examples/file_reading_eval/target_outputs/bad_citation_output.json",
         "examples/file_reading_eval/target_outputs/hallucinated_output.json",

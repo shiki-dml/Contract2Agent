@@ -1,0 +1,68 @@
+{
+  "profile_id": "healthcare-multi-agent-privacy",
+  "name": "Healthcare triage multi-agent workflow",
+  "description": "A multi-agent assistant routes patient intake notes through triage, scheduling, billing, and follow-up agents.",
+  "domain": "healthcare",
+  "sensitive_data": ["patient identifiers", "diagnosis notes", "insurance numbers"],
+  "declared_controls": ["redaction", "audit_log"],
+  "policy_constraints": ["do not expose patient identifiers to non-clinical tools"],
+  "forbidden_disclosures": ["patient identifiers in inter-agent messages", "diagnosis notes in logs"],
+  "data_flows": [
+    {
+      "flow_id": "intake_to_triage_agent",
+      "channel": "inter_agent",
+      "source": "intake_agent",
+      "destination": "triage_agent",
+      "contains_sensitive_data": true,
+      "data_categories": ["patient identifiers", "diagnosis notes"],
+      "controls": ["redaction"],
+      "untrusted_input": false,
+      "external_destination": false,
+      "retention": "session"
+    },
+    {
+      "flow_id": "triage_to_scheduler_tool",
+      "channel": "tool_call",
+      "source": "triage_agent",
+      "destination": "external_scheduler",
+      "contains_sensitive_data": true,
+      "data_categories": ["patient identifiers"],
+      "controls": [],
+      "untrusted_input": true,
+      "external_destination": true,
+      "retention": "unknown"
+    },
+    {
+      "flow_id": "debug_log_dump",
+      "channel": "log",
+      "source": "orchestrator",
+      "destination": "central_logs",
+      "contains_sensitive_data": true,
+      "data_categories": ["diagnosis notes"],
+      "controls": [],
+      "untrusted_input": false,
+      "external_destination": false,
+      "retention": "30 days"
+    }
+  ],
+  "tools": [
+    {
+      "name": "external_scheduler",
+      "category": "calendar_api",
+      "receives_sensitive_data": true,
+      "sends_external": true,
+      "untrusted_input_source": true,
+      "requires_approval": false,
+      "controls": []
+    }
+  ],
+  "training": {
+    "uses_private_training": false,
+    "sensitive_training_data": false,
+    "privacy_mechanism": "none"
+  },
+  "metadata": {
+    "example": true,
+    "frontier_pattern": "multi-agent healthcare workflow with internal-channel leakage risk"
+  }
+}

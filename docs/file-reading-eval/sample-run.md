@@ -199,3 +199,27 @@ Actionable fixes:
 - Hallucinated fact: require every factual claim to carry at least one citation.
 - Malformed JSON: validate and repair schema before final submission.
 - Optional judge redacted content: keep sensitive content out of judge prompts or use deterministic graders only.
+
+## Optional: Paper Reading Task Pack
+
+For a more research-flavored example, inspect:
+
+- `examples/file_reading_eval/corpus/papers/qasper_paper_card.md`
+- `examples/file_reading_eval/corpus/papers/longbench_paper_card.md`
+- `examples/file_reading_eval/corpus/papers/blt_private_learning_card.md`
+- `examples/file_reading_eval/tasks/paper_tasks.jsonl`
+
+The files are compact paper cards with attribution and license notes, not full
+paper copies. The task pack exercises paper-grounded lookup, citation-required
+QA, multi-file comparison, and abstention when page-level details are absent.
+
+```bash
+python -m contract2agent.cli file-eval import-local \
+  --input examples/file_reading_eval/corpus \
+  --out .runs/paper-corpus \
+  --manifest .runs/paper-corpus/manifest.json
+
+python -m contract2agent.cli file-eval validate \
+  --corpus .runs/paper-corpus/manifest.json \
+  --tasks examples/file_reading_eval/tasks/paper_tasks.jsonl
+```

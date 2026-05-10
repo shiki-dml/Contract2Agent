@@ -35,6 +35,7 @@ detail. Do not duplicate full manuals into this landing page.
 - Diagnostic mode docs live in [quick.md](quick.md), [deep.md](deep.md), and [auto.md](auto.md).
 - Feature docs include [triage.md](triage.md), [time-cost.md](time-cost.md), [patch-preview.md](patch-preview.md), [baselines.md](baselines.md), and [failure-taxonomy.md](failure-taxonomy.md).
 - File-reading evaluation docs live under [file-reading-eval/](file-reading-eval/README.md).
+- Privacy evaluation docs live under [privacy-eval/](privacy-eval/README.md).
 - Static demos live under [agent-eval/](agent-eval/index.html) and [playground/](playground/index.html).
 - Historical audits live under [audits/](audits/2026-05-04-bug-audit.md).
 

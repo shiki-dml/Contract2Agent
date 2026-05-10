@@ -1,0 +1,65 @@
+{
+  "profile_id": "federated-keyboard-blt-profile",
+  "name": "On-device keyboard language model updater",
+  "description": "A federated training workflow updates a mobile keyboard language model from private on-device text statistics.",
+  "domain": "on_device_language_model",
+  "sensitive_data": ["typed text statistics", "device participation history"],
+  "declared_controls": ["data_minimization", "dp_accounting", "private_aggregation", "audit_log"],
+  "policy_constraints": ["do not centralize raw user text", "publish DP accounting artifacts before release"],
+  "data_flows": [
+    {
+      "flow_id": "client_update_to_aggregator",
+      "channel": "training_update",
+      "source": "mobile_clients",
+      "destination": "federated_aggregator",
+      "contains_sensitive_data": true,
+      "data_categories": ["typed text statistics"],
+      "controls": ["dp_noise", "private_aggregation", "data_minimization"],
+      "untrusted_input": false,
+      "external_destination": false,
+      "retention": "ephemeral"
+    },
+    {
+      "flow_id": "release_audit_artifact",
+      "channel": "artifact",
+      "source": "training_pipeline",
+      "destination": "release_review",
+      "contains_sensitive_data": false,
+      "data_categories": ["privacy budget summary"],
+      "controls": ["audit_log", "access_control"],
+      "untrusted_input": false,
+      "external_destination": false,
+      "retention": "release record"
+    }
+  ],
+  "tools": [
+    {
+      "name": "federated_aggregator",
+      "category": "training_pipeline",
+      "receives_sensitive_data": true,
+      "sends_external": false,
+      "untrusted_input_source": false,
+      "requires_approval": true,
+      "controls": ["private_aggregation", "approval"]
+    }
+  ],
+  "training": {
+    "uses_private_training": true,
+    "sensitive_training_data": true,
+    "privacy_mechanism": "BLT-DP-FTRL",
+    "privacy_unit": "user",
+    "epsilon": 3.0,
+    "delta": 0.0000001,
+    "clipping_norm": 1.0,
+    "noise_multiplier": 1.2,
+    "accountant": "RDP",
+    "federated": true,
+    "multi_participation": true,
+    "participation_bound": 8,
+    "notes": "Example profile inspired by BLT-style private learning; no training run is included."
+  },
+  "metadata": {
+    "example": true,
+    "frontier_pattern": "federated on-device LLM private training"
+  }
+}

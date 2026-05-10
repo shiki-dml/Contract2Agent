@@ -93,3 +93,21 @@ The command adapter is useful for local/custom judges and CI tests because it av
 - `no_citation_output.json`: correct answer without structured citations.
 
 Use `sample_tasks.jsonl`, `citation_tasks.jsonl`, `unanswerable_tasks.jsonl`, and `distractor_tasks.jsonl` to exercise citation mismatch, abstention, distractor resistance, forbidden-file behavior, reference comparison, and report generation.
+
+## Open Paper Cards
+
+The `corpus/papers/` directory contains two small attributed paper cards:
+
+- `corpus/papers/qasper_paper_card.md`: QASPER, useful for paper-grounded QA and supporting-evidence tasks.
+- `corpus/papers/longbench_paper_card.md`: LongBench, useful for long-context and multi-file task design.
+
+These are not full paper copies. They are compact, attributed example files with
+license notes and line-level facts so deterministic citation checks can run
+without downloading PDFs.
+
+Validate the paper-task pack with:
+
+```bash
+python -m contract2agent.cli file-eval import-local --input examples/file_reading_eval/corpus --out .runs/paper-corpus --manifest .runs/paper-corpus/manifest.json
+python -m contract2agent.cli file-eval validate --corpus .runs/paper-corpus/manifest.json --tasks examples/file_reading_eval/tasks/paper_tasks.jsonl
+```

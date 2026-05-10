@@ -1,0 +1,67 @@
+{
+  "profile_id": "rag-customer-support-privacy",
+  "name": "Customer support RAG agent",
+  "description": "A support agent reads tickets, retrieves policy passages, and drafts replies with customer-specific context.",
+  "domain": "customer_support_rag",
+  "sensitive_data": ["customer emails", "account identifiers", "support ticket text"],
+  "declared_controls": ["redaction", "retention_policy", "allowlist"],
+  "policy_constraints": ["never send account identifiers to web search", "store only sanitized support summaries"],
+  "data_flows": [
+    {
+      "flow_id": "ticket_to_vector_store",
+      "channel": "vector_store",
+      "source": "support_ticket",
+      "destination": "retrieval_index",
+      "contains_sensitive_data": true,
+      "data_categories": ["customer emails", "support ticket text"],
+      "controls": ["redaction", "retention_policy"],
+      "untrusted_input": true,
+      "external_destination": false,
+      "retention": "14 days"
+    },
+    {
+      "flow_id": "retrieval_to_answer",
+      "channel": "output",
+      "source": "retrieval_index",
+      "destination": "customer_reply",
+      "contains_sensitive_data": true,
+      "data_categories": ["support ticket text"],
+      "controls": ["allowlist", "redaction", "human_review"],
+      "untrusted_input": true,
+      "external_destination": true,
+      "retention": "customer communication"
+    },
+    {
+      "flow_id": "tool_debug_artifact",
+      "channel": "artifact",
+      "source": "tool_trace",
+      "destination": "debug_bundle",
+      "contains_sensitive_data": true,
+      "data_categories": ["account identifiers"],
+      "controls": [],
+      "untrusted_input": false,
+      "external_destination": false,
+      "retention": "unknown"
+    }
+  ],
+  "tools": [
+    {
+      "name": "policy_search",
+      "category": "retrieval",
+      "receives_sensitive_data": false,
+      "sends_external": false,
+      "untrusted_input_source": true,
+      "requires_approval": false,
+      "controls": ["allowlist"]
+    }
+  ],
+  "training": {
+    "uses_private_training": false,
+    "sensitive_training_data": true,
+    "privacy_mechanism": "none"
+  },
+  "metadata": {
+    "example": true,
+    "frontier_pattern": "RAG privacy and retention for customer-support agents"
+  }
+}

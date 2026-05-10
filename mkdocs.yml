@@ -35,10 +35,12 @@ nav:
           - CLI Guide: file-reading-eval/cli-guide.md
           - Sample Run: file-reading-eval/sample-run.md
           - Report Examples: file-reading-eval/report-examples.md
+          - Open Source Agent References: file-reading-eval/open-source-agent-references.md
           - zh-CN: file-reading-eval/README.zh-CN.md
           - zh-CN CLI Guide: file-reading-eval/cli-guide.zh-CN.md
           - zh-CN Sample Run: file-reading-eval/sample-run.zh-CN.md
           - zh-CN Report Examples: file-reading-eval/report-examples.zh-CN.md
+      - Privacy Eval: privacy-eval/README.md
       - Failure Taxonomy: failure-taxonomy.md
       - Baselines: baselines.md
       - Patch Preview: patch-preview.md

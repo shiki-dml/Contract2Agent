@@ -53,6 +53,7 @@ Core Python modules live under `contract2agent/evaluation/`:
 - `prediction.py`: cautious outcome estimates.
 - `reports.py` / `report.py`: Markdown and JSON report rendering.
 - `file_reading/`: specialized `file_reading_agent` adapter with local corpus import, task JSONL loading/generation, black-box CLI runs, deterministic graders, reference comparison, and Markdown/JSON reports.
+- `privacy_eval/`: static privacy-risk evaluator for agent data flows, internal channels, tools, logs, artifacts, vector stores, and private-training metadata.
 
 ## Supported Broad Agent Types
 
@@ -154,6 +155,39 @@ Detailed file-reading docs:
 
 Runnable examples: [examples/file_reading_eval/README.md](examples/file_reading_eval/README.md).
 
+## Privacy Evaluation
+
+`privacy-eval` is a second specialized adapter for privacy-sensitive agent
+workflows. It checks pre-runtime profiles for sensitive data flows, internal
+agent channels, tool-call exposure, logs, artifacts, vector stores, untrusted
+input, approval gates, minimization, auditability, and optional
+differential-privacy training metadata.
+
+It is static and dependency-free. It does not install or run AgentLeak,
+AgentDojo, Opacus, OpenDP, or a DP accountant. Those projects are contextual
+references used to shape checks, not imported performance evidence.
+
+Example:
+
+```bash
+c2a privacy-eval \
+  --profile examples/privacy_eval/healthcare_multi_agent_privacy.json \
+  --out .runs/privacy-healthcare.md
+```
+
+JSON output and reference metadata:
+
+```bash
+c2a privacy-eval \
+  --profile examples/privacy_eval/federated_keyboard_blt_profile.json \
+  --format json \
+  --out .runs/privacy-keyboard.json
+c2a privacy-eval --list-references
+```
+
+Detailed privacy docs: [docs/privacy-eval/README.md](docs/privacy-eval/README.md).
+Runnable examples: [examples/privacy_eval/README.md](examples/privacy_eval/README.md).
+
 ## CLI Usage
 
 Existing local diagnosis commands remain available:
@@ -161,6 +195,7 @@ Existing local diagnosis commands remain available:
 ```bash
 c2a --help
 c2a file-eval --help
+c2a privacy-eval --help
 c2a demo
 c2a check
 c2a check-all --diagnose
@@ -209,16 +244,19 @@ markdown = ReportRenderer().render_markdown(profile, evidence, scorecard, predic
 |-- contract2agent/
 |   |-- evaluation/              # Generalized agent evaluation framework
 |   |   `-- file_reading/         # CLI-driven file-reading agent adapter
+|   |-- privacy_eval/             # Static privacy-risk evaluation adapter
 |   |-- cost_estimate/
 |   |-- patch_preview/
 |   `-- triage/
 |-- docs/
 |   |-- agent-eval/              # Static generalized agent evaluation demo
 |   |-- file-reading-eval/       # File-reading eval CLI guide
+|   |-- privacy-eval/            # Privacy eval guide
 |   |-- data/agent_eval/         # Static source/category/profile metadata
 |   `-- playground/              # Legacy contract-review playground
 |-- examples/agent_eval/         # Small sample profiles, summaries, sources
 |-- examples/file_reading_eval/  # File-reading eval corpus, tasks, dummy agents
+|-- examples/privacy_eval/       # Privacy-sensitive workflow profiles
 |-- scripts/
 |-- tests/
 |-- pyproject.toml
@@ -244,7 +282,7 @@ python scripts/check_docs_links.py
 python -m mkdocs build --strict
 ```
 
-The test suite covers schema serialization, classification invariants, anti-overfitting, evidence-source handling, benchmark-reference discipline, file-reading corpus/task/run/grade/report behavior, dummy-agent CLI runs, report rendering, Golden tests, CLI smoke tests, docs integrity, GitHub Pages static tests, and the legacy Evaluation Lab.
+The test suite covers schema serialization, classification invariants, anti-overfitting, evidence-source handling, benchmark-reference discipline, file-reading corpus/task/run/grade/report behavior, privacy-eval profiles/reports/CLI behavior, dummy-agent CLI runs, report rendering, Golden tests, CLI smoke tests, docs integrity, GitHub Pages static tests, and the legacy Evaluation Lab.
 
 ## Limitations
 
@@ -254,6 +292,7 @@ The test suite covers schema serialization, classification invariants, anti-over
 - Benchmark references are contextual unless actual experiment results exist.
 - File-reading performance scores require an observed `file-eval run`; profile-only reports do not claim observed performance.
 - File-reading reference comparisons are contextual unless task pack, scoring method, environment, and comparable conditions match.
+- Privacy-eval is static readiness analysis; real privacy claims require runtime traces, accountant outputs, and deployment review.
 - Outcome predictions are estimates, not guarantees.
 - GitHub Pages remains static and does not run arbitrary agent experiments.
 - Financial transaction evaluation is simulated-only.

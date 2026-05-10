@@ -29,6 +29,7 @@ This adapter is evaluation-first. A profile-only report can describe readiness a
 - [CLI user guide](cli-guide.md)
 - [Sample run walkthrough](sample-run.md)
 - [Report examples and scoring guide](report-examples.md)
+- [Open-source agent references](open-source-agent-references.md)
 - [中文概览](README.zh-CN.md)
 - [中文 CLI 指南](cli-guide.zh-CN.md)
 - [中文样例运行](sample-run.zh-CN.md)
@@ -41,6 +42,7 @@ Repository examples:
 - `examples/file_reading_eval/target_outputs/good_output.json`
 - `examples/file_reading_eval/expected_reports/deterministic_report.example.md`
 - `examples/file_reading_eval/expected_reports/deterministic_report.example.json`
+- `examples/file_reading_eval/profiles/paperqa2_open_source_profile.json`
 
 ## Minimum Workflow
 

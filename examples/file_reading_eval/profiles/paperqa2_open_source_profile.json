@@ -1,0 +1,70 @@
+{
+  "agent_id": "paperqa2-open-source-reference",
+  "name": "PaperQA2 open-source reference profile",
+  "description": "Reference profile for Future-House PaperQA2 as an open-source agentic RAG system for reading local scientific documents and returning evidence-grounded answers.",
+  "declared_capabilities": [
+    "read local PDFs and text-like files",
+    "build a local full-text and embedding-backed index",
+    "retrieve and summarize evidence",
+    "answer with in-text citations",
+    "configure source limits, readers, prompts, and model providers"
+  ],
+  "tools": [
+    "pqa CLI",
+    "paperqa.ask",
+    "paperqa.agents.agent_query",
+    "SearchPapers",
+    "GatherEvidence",
+    "GenerateAnswer",
+    "Docs",
+    "reader packages"
+  ],
+  "tool_permissions": [
+    "read_configured_document_directory",
+    "write_local_index_cache",
+    "optional_network_metadata_lookup",
+    "optional_llm_provider_call",
+    "optional_embedding_provider_call"
+  ],
+  "can_list_files": true,
+  "can_search_files": true,
+  "can_read_files": true,
+  "can_read_binary_files": true,
+  "can_read_pdf": true,
+  "can_access_repo": false,
+  "can_access_external_paths": false,
+  "can_use_network": true,
+  "can_write_files": true,
+  "can_run_shell": false,
+  "requires_human_approval": true,
+  "citation_support": "document_or_page_citations; Contract2Agent line citations require adapter mapping",
+  "output_schema_support": "adapter_required",
+  "trace_support": "callbacks_or_adapter_required",
+  "policy_constraints": [
+    "Run only against an approved corpus directory.",
+    "Keep PaperQA2 indexes and caches inside the run directory when evaluating.",
+    "Disable or explicitly approve metadata, LLM, and embedding network calls.",
+    "Use manifest metadata when possible to reduce LLM metadata inference.",
+    "Do not treat upstream publications or demos as observed Contract2Agent results."
+  ],
+  "metadata": {
+    "source_url": "https://github.com/Future-House/paper-qa",
+    "source_license": "Apache-2.0",
+    "curated_on": "2026-05-10",
+    "source_type": "open_source_agent_reference",
+    "observed_contract2agent_run": false,
+    "content_inventory": [
+      ".github automation",
+      "docs tutorials and LitQA2 split metadata",
+      "packages for docling, nemotron, pymupdf, and pypdf readers",
+      "src/paperqa agents, clients, configs, sources, docs, readers, settings, prompts, and types",
+      "tests with cassettes, stub data, agent tests, CLI tests, client tests, config tests, and PaperQA tests",
+      "README, LICENSE, CITATION.cff, CONTRIBUTING.md, pyproject.toml, and uv.lock"
+    ],
+    "evaluation_use": [
+      "open-source capability profile",
+      "adapter design reference",
+      "task family inspiration for PDF, Office, code, HTML, multimodal, evidence ranking, and source-limit tests"
+    ]
+  }
+}

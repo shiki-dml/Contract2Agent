@@ -12,6 +12,113 @@
       "metrics_available": [],
       "notes": ["Contextual fixture source only."],
       "limitations": ["Not a benchmark and not a direct score."]
+    },
+    {
+      "source_id": "qasper_paper_card",
+      "title": "QASPER paper card",
+      "source_type": "open_paper_card",
+      "domain": "scientific_paper_qa",
+      "source_url": "https://arxiv.org/abs/2105.03011",
+      "local_path": "examples/file_reading_eval/corpus/papers/qasper_paper_card.md",
+      "license": "CC BY 4.0",
+      "provenance": "Compact attributed paper card derived from arXiv metadata and abstract-level facts for line-citation examples.",
+      "reliability": 0.35,
+      "applicable_task_types": [
+        "key_value_lookup",
+        "citation_required_qa",
+        "unanswerable_question"
+      ],
+      "metrics_available": [],
+      "notes": [
+        "Use as a small local corpus file for paper-grounded QA examples."
+      ],
+      "limitations": [
+        "Not a full paper copy.",
+        "Contextual example source only; no target-agent score is implied.",
+        "Do not treat paper claims or dataset results as Contract2Agent observed results."
+      ]
+    },
+    {
+      "source_id": "longbench_paper_card",
+      "title": "LongBench paper card",
+      "source_type": "open_paper_card",
+      "domain": "long_context",
+      "source_url": "https://aclanthology.org/2024.acl-long.172/",
+      "local_path": "examples/file_reading_eval/corpus/papers/longbench_paper_card.md",
+      "license": "CC BY 4.0",
+      "provenance": "Compact attributed paper card derived from ACL Anthology metadata and abstract-level facts for line-citation examples.",
+      "reliability": 0.35,
+      "applicable_task_types": [
+        "citation_required_qa",
+        "multi_file_qa",
+        "needle_in_corpus",
+        "summary_with_citations"
+      ],
+      "metrics_available": [],
+      "notes": [
+        "Use as a small local corpus file for long-context and multi-file examples."
+      ],
+      "limitations": [
+        "Not a full paper copy.",
+        "Contextual example source only; no target-agent score is implied.",
+        "Do not treat benchmark claims as Contract2Agent observed results."
+      ]
+    },
+    {
+      "source_id": "blt_private_learning_paper_card",
+      "title": "BLT-DP-FTRL private learning paper card",
+      "source_type": "open_paper_card",
+      "domain": "private_learning",
+      "source_url": "https://arxiv.org/abs/2408.08868",
+      "local_path": "examples/file_reading_eval/corpus/papers/blt_private_learning_card.md",
+      "license": "CC BY 4.0",
+      "provenance": "Compact attributed paper card derived from arXiv and Google Research publication metadata and abstract-level facts.",
+      "reliability": 0.35,
+      "applicable_task_types": [
+        "citation_required_qa",
+        "multi_file_qa",
+        "privacy_mechanism_selection"
+      ],
+      "metrics_available": [],
+      "notes": [
+        "Use as a small local corpus file for private-learning and DP mechanism-selection examples."
+      ],
+      "limitations": [
+        "Not a full paper copy.",
+        "Contextual example source only; no target-agent score is implied.",
+        "Do not treat paper claims or production results as Contract2Agent observed results."
+      ]
+    },
+    {
+      "source_id": "paperqa2",
+      "title": "PaperQA2 open-source file-reading agent reference",
+      "source_type": "open_source_agent_reference",
+      "domain": "scientific_document_rag",
+      "source_url": "https://github.com/Future-House/paper-qa",
+      "license": "Apache-2.0",
+      "provenance": "Curated metadata from the Future-House/paper-qa GitHub repository, README, pyproject metadata, and public repository tree.",
+      "reliability": 0.22,
+      "applicable_task_types": [
+        "citation_required_qa",
+        "summary_with_citations",
+        "multi_file_qa",
+        "long_document_robustness",
+        "table_or_key_value_lookup",
+        "conflicting_evidence",
+        "source_code_lookup"
+      ],
+      "metrics_available": [],
+      "notes": [
+        "Open-source reference for local document indexing, evidence retrieval, in-text citations, configurable source limits, reader packages, and agent adapter design.",
+        "Use as contextual source material until a local Contract2Agent run artifact exists."
+      ],
+      "limitations": [
+        "Contextual reference only; no target-agent score is implied.",
+        "Use for task design or comparison notes unless a comparable observed run is imported.",
+        "No upstream benchmark claim or publication result is imported as target-agent performance.",
+        "External metadata, LLM, and embedding calls require explicit local configuration outside this dependency-free adapter.",
+        "Page-level or document-level citations need adapter mapping before they can satisfy Contract2Agent line-citation graders."
+      ]
     }
   ]
 }

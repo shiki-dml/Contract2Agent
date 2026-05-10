@@ -24,6 +24,7 @@ runtime evaluation.
 | Legacy contract modules | Contract schemas, requirement parsing, scaffold generation, trace checking, counterexamples, diagnosis, diagnostic modes, capabilities, and baselines. | Existing contract diagnosis behavior unless a sprint contract changes it. |
 | `contract2agent/evaluation/` | Generalized agent profile evaluation, evidence, scoring, prediction, benchmark/reference context, and reports. | Declared, inferred, observed, reference, prediction, and missing evidence separation. |
 | `contract2agent/evaluation/file_reading/` | Local file-reading eval corpus/task/run/grade/report/reference/judge adapter. | Deterministic default grading, corpus boundaries, forbidden-file handling, key redaction, and no fake observed score. |
+| `contract2agent/privacy_eval/` | Static privacy-risk evaluation for agent profiles and workflows. | No live privacy library execution, no benchmark score import, and no DP claim without runtime/accountant evidence. |
 | `contract2agent/triage/` | Static intake, risk, coverage, readiness, and next-mode recommendations. | No live agent execution or external calls. |
 | `contract2agent/cost_estimate/` | Static time/cost estimate from configuration, triage, baselines, and rules. | Estimate-only behavior; no test execution or API calls. |
 | `contract2agent/patch_preview/` | Preview-only patch proposal reports and diffs. | No direct application of patches unless a future contract and tests explicitly add that behavior. |
@@ -63,6 +64,19 @@ File-reading evaluation:
 6. Compare references only when task pack, scoring method, environment, and conditions are compatible.
 7. Render reports that separate deterministic scores from optional judge supplements.
 
+Privacy evaluation:
+
+1. Load a privacy profile with sensitive data categories, data flows, tools,
+   controls, and optional private-training metadata.
+2. Score leakage risk across outputs, inter-agent messages, shared memory,
+   tool calls, logs, artifacts, vector stores, and training updates.
+3. Flag prompt-injection privacy exposure when untrusted data reaches private
+   context or tool paths.
+4. Check DP/private-training metadata for privacy unit, epsilon, delta,
+   clipping, noise or mechanism, accountant, and federated participation notes.
+5. Render Markdown or JSON with source references, findings, next tests, and
+   limitations. External projects and papers remain contextual.
+
 ## Harness Flow
 
 | Stage | Step 1 | Step 2 | Step 3 |
@@ -97,4 +111,5 @@ Future agents should not casually change:
 - `agentdoctor` legacy compatibility paths and alias behavior.
 - Evidence semantics in scoring, prediction, feature registry, and reports.
 - File-reading corpus and forbidden-file boundaries.
+- Privacy-eval source-reference, DP-readiness, and no-fake-score boundaries.
 - Preview-only patch behavior and auto-mode safety controls.

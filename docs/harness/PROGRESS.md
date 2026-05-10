@@ -218,3 +218,269 @@ docs/harness gates that the environment allows before upgrading harness status.
 Run an evaluator pass for the Codex tooling configuration, then enable and test
 only the specific MCP server needed for a concrete task with explicit network
 and credential approval.
+
+## 2026-05-10 - PaperQA2 Open-Source File-Reading Reference
+
+### Scope
+
+- User request: find a suitable GitHub file-reading agent and use its
+  open-source content to enrich the file-reading feature.
+- Selected reference: Future-House PaperQA2
+  (`https://github.com/Future-House/paper-qa`), Apache-2.0.
+- Allowed write set used: file-reading reference metadata, example profile,
+  file-reading docs, MkDocs nav, focused tests, and handoff/progress records.
+- Out of scope: vendoring upstream code or datasets, adding dependencies,
+  running PaperQA2, importing benchmark results, updating feature status,
+  staging, committing, resetting, deleting, or renaming files.
+
+### Baseline Inspection
+
+| Command | Result |
+| --- | --- |
+| `git status --short` | Initial sandboxed attempt failed with `windows sandbox: setup refresh failed`; escalated retry returned clean output. |
+| `docs/AGENT_HANDOFF.md`, `docs/harness/PROGRESS.md`, `docs/ARCHITECTURE.md`, `docs/CODEMAP.md` | Read before edits. |
+| `.agents/skills/file-reading-eval-architect/SKILL.md` | Read and applied. |
+| `.agents/skills/research-grounded-eval/SKILL.md` | Read and applied. |
+
+### External Sources Consulted
+
+- `https://github.com/Future-House/paper-qa`
+- `https://github.com/Future-House/paper-qa/blob/main/README.md`
+- `https://github.com/Future-House/paper-qa/blob/main/pyproject.toml`
+- `https://github.com/Future-House/paper-qa/tree/main/docs`
+- `https://github.com/Future-House/paper-qa/tree/main/packages`
+- `https://github.com/Future-House/paper-qa/tree/main/src/paperqa/agents`
+- `https://github.com/Future-House/paper-qa/tree/main/src/paperqa/sources`
+- `https://github.com/Future-House/paper-qa/tree/main/tests`
+
+### Files Updated
+
+- `contract2agent/evaluation/file_reading/references.py`
+- `docs/file-reading-eval/README.md`
+- `docs/file-reading-eval/open-source-agent-references.md`
+- `examples/file_reading_eval/profiles/paperqa2_open_source_profile.json`
+- `examples/file_reading_eval/references/reference_sources.json`
+- `mkdocs.yml`
+- `tests/test_file_reading_eval.py`
+- `tests/test_file_reading_docs_examples.py`
+- `docs/AGENT_HANDOFF.md`
+- `docs/harness/PROGRESS.md`
+
+### What Changed
+
+- Added PaperQA2 to `curated_reference_sources()` as contextual
+  `open_source_agent_reference` metadata with license, provenance,
+  applicable task families, and limitations.
+- Added a PaperQA2 profile fixture to support profile-only analysis and future
+  adapter planning.
+- Added a file-reading docs page that inventories the upstream open-source
+  repository content and converts it into task-family, safety, and adapter
+  guidance.
+- Added PaperQA2 to example reference metadata and MkDocs navigation.
+- Added regression tests that require PaperQA2 to remain contextual metadata
+  without imported metrics or observed scores.
+
+### Validation Log
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `python -m pytest tests\test_file_reading_eval.py tests\test_file_reading_docs_examples.py` | Passed | 39 tests passed. |
+| `python scripts\check_docs_links.py` | Passed | Checked 60 Markdown files; all relative links resolve. |
+| `python -m compileall -q contract2agent tests scripts` | Passed | No output. |
+| `python -m mkdocs build --strict` | Passed | Built docs into `site/`. |
+| `python scripts\harness\validate_docs.py` | Passed | Validated required docs, module READMEs, AGENTS.md length, and feature registry shape. |
+| `python -m contract2agent.cli file-eval list-references` | Passed | Output includes `paperqa2` as `open_source_agent_reference`. |
+| `git status --short` | Ran | Shows expected modified and new files from this task. |
+
+### Risks And Blockers
+
+- PaperQA2 was researched from public GitHub sources but not installed or run;
+  no observed Contract2Agent result exists.
+- Upstream PaperQA2 claims, papers, examples, and benchmark artifacts were not
+  imported as scores.
+- A future adapter needs API verification, citation normalization, corpus
+  containment, cache containment, and explicit network/LLM/embedding controls.
+- `site/` was produced by MkDocs and should remain an ignored build artifact.
+
+### Next Step
+
+Prototype a PaperQA2 black-box adapter only if optional dependency installation
+and provider/network behavior are explicitly approved, then run it against a
+small local corpus and store the observed run separately from contextual
+reference metadata.
+
+## 2026-05-10 - Open Paper Cards For File-Reading Examples
+
+### Scope
+
+- User request: find two suitable papers and turn them into examples for the
+  reading-files feature.
+- Selected papers:
+  - QASPER (`https://arxiv.org/abs/2105.03011`), CC BY 4.0.
+  - LongBench (`https://aclanthology.org/2024.acl-long.172/`), CC BY 4.0 under
+    ACL Anthology policy for 2016+ materials.
+- Allowed write set used: file-reading example corpus, tasks, reference
+  metadata, docs, tests, and handoff/progress records.
+- Out of scope: vendoring full paper PDFs or full paper text, adding
+  dependencies, network import implementation, benchmark/result import,
+  feature status changes, staging, committing, resetting, deleting, or renaming
+  files.
+
+### External Sources Consulted
+
+- `https://arxiv.org/abs/2105.03011`
+- `https://creativecommons.org/licenses/by/4.0/`
+- `https://aclanthology.org/2024.acl-long.172/`
+- `https://aclanthology.org/faq/copyright/`
+
+### Files Updated
+
+- `examples/file_reading_eval/corpus/papers/qasper_paper_card.md`
+- `examples/file_reading_eval/corpus/papers/longbench_paper_card.md`
+- `examples/file_reading_eval/tasks/paper_tasks.jsonl`
+- `examples/file_reading_eval/references/reference_sources.json`
+- `examples/file_reading_eval/README.md`
+- `docs/file-reading-eval/sample-run.md`
+- `tests/test_file_reading_docs_examples.py`
+- `docs/AGENT_HANDOFF.md`
+- `docs/harness/PROGRESS.md`
+
+### What Changed
+
+- Added two compact paper-card corpus files with source URLs, license notes,
+  attribution, and line-level facts for deterministic citation checks.
+- Added `paper_tasks.jsonl` covering key-value lookup, citation-required QA,
+  multi-file comparison, and unanswerable abstention.
+- Added structured example reference metadata for both paper cards with
+  contextual-only limitations and no imported metrics.
+- Documented the paper-card workflow in the examples README and sample-run
+  guide.
+- Added a test that imports the sample corpus and validates `paper_tasks.jsonl`
+  against the generated manifest.
+
+### Validation Log
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `python -m pytest tests\test_file_reading_eval.py tests\test_file_reading_docs_examples.py` | Passed | 40 tests passed. |
+| `python scripts\check_docs_links.py` | Passed | Checked 62 Markdown files; all relative links resolve. |
+| `python -m compileall -q contract2agent tests scripts` | Passed | No output. |
+| `python -m mkdocs build --strict` | Passed | Built docs into `site/`. |
+| `python scripts\harness\validate_docs.py` | Passed | Validated required docs, module READMEs, AGENTS.md length, and feature registry shape. |
+| `python -m contract2agent.cli file-eval import-local --input examples/file_reading_eval/corpus --out .runs/paper-corpus --manifest .runs/paper-corpus/manifest.json` | Passed | Imported 11 documents. |
+| `python -m contract2agent.cli file-eval validate --corpus .runs/paper-corpus/manifest.json --tasks examples/file_reading_eval/tasks/paper_tasks.jsonl` | Passed | Task file IDs, spans, and quotes validated. |
+| `git diff --check` | Passed | No whitespace errors. |
+
+### Risks And Blockers
+
+- The examples are paper cards, not full-paper ingestion. Full PDF/text
+  ingestion remains future work.
+- Source paper claims are contextual examples only; they are not observed
+  Contract2Agent scores or benchmark claims.
+- `.runs/paper-corpus` and `site/` are local generated artifacts from
+  validation and should remain ignored.
+
+### Next Step
+
+Add a small paper-aware dummy reader or adapter fixture if future tasks need
+observed run artifacts for `paper_tasks.jsonl`; otherwise keep these examples as
+validated corpus/task fixtures.
+
+## 2026-05-10 - BLT Paper Card And Privacy Eval
+
+### Scope
+
+- User request: add another AI paper example, specifically the BLTs
+  private-learning paper, and add one complete feature beyond reading-files
+  based on related GitHub project comparison and current privacy/eval themes.
+- Added paper reference: `A Hassle-free Algorithm for Private Learning in
+  Practice: Don't Use Tree Aggregation, Use BLTs`
+  (`https://arxiv.org/abs/2408.08868` and Google Research publication page).
+- Added feature: dependency-free `privacy-eval` static privacy-risk analysis
+  for agent profiles, with CLI, schemas, reports, docs, examples, and tests.
+- External GitHub references used as contextual design input only:
+  AgentLeak, AgentDojo, Opacus, and OpenDP.
+- Out of scope: importing benchmark scores, running privacy attacks, executing
+  DP accounting, adding dependencies, GitHub Pages runtime calls, or marking any
+  feature verified from external claims.
+
+### Files Updated
+
+- `contract2agent/privacy_eval/`
+- `contract2agent/cli.py`
+- `contract2agent/evaluation/file_reading/references.py`
+- `examples/file_reading_eval/corpus/papers/`
+- `examples/file_reading_eval/tasks/paper_tasks.jsonl`
+- `examples/file_reading_eval/references/reference_sources.json`
+- `examples/privacy_eval/`
+- `docs/privacy-eval/README.md`
+- `docs/file-reading-eval/README.md`
+- `docs/file-reading-eval/sample-run.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CODEMAP.md`
+- `docs/README.md`
+- `docs/harness/EVAL_MATRIX.md`
+- `README.md`
+- `mkdocs.yml`
+- `tests/test_privacy_eval.py`
+- `tests/test_file_reading_eval.py`
+- `tests/test_file_reading_docs_examples.py`
+- `docs/AGENT_HANDOFF.md`
+- `docs/harness/PROGRESS.md`
+
+### What Changed
+
+- Added a BLT paper-card corpus file and a citation-checked task that exercises
+  mechanism lookup for private-learning reading examples.
+- Added `privacy-eval` profile schemas, curated privacy reference metadata,
+  deterministic finding generation, report rendering, and CLI integration
+  through both Typer and argparse paths.
+- Added examples for healthcare multi-agent workflows, federated keyboard BLT
+  deployment analysis, and RAG customer-support privacy review.
+- Added docs that compare related GitHub project capabilities while keeping
+  their outputs as framework references, not Contract2Agent results.
+- Added tests that cover schema serialization, report rendering, CLI writes,
+  curated references, BLT context, and file-reading task validation.
+
+### Validation Log
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `python -m pytest tests\test_privacy_eval.py tests\test_file_reading_eval.py tests\test_file_reading_docs_examples.py tests\test_agent_evaluation_framework.py` | Passed | 69 tests passed. |
+| `python -m pytest` | Passed | 365 tests passed. |
+| `python -m compileall -q contract2agent tests scripts` | Passed | No output. |
+| `git diff --check` | Passed | No whitespace errors. |
+| `python scripts\check_docs_links.py` | Passed | Checked 65 Markdown files; all relative links resolve. |
+| `python -m mkdocs build --strict` | Passed | Built docs into `site/`. |
+| `python scripts\harness\validate_docs.py` | Passed | Validated required docs, module READMEs, AGENTS length, and feature registry shape. |
+| `python -m contract2agent.cli privacy-eval --profile examples/privacy_eval/healthcare_multi_agent_privacy.json --out .runs/privacy-healthcare.md` | Passed | Wrote Markdown report. |
+| `python -m contract2agent.cli privacy-eval --profile examples/privacy_eval/federated_keyboard_blt_profile.json --format json --out .runs/privacy-keyboard.json` | Passed | Wrote JSON report. |
+| `python -m contract2agent.cli privacy-eval --list-references` | Passed | Listed privacy references. |
+| `python -m contract2agent.cli file-eval import-local --input examples/file_reading_eval/corpus --out .runs/paper-corpus --manifest .runs/paper-corpus/manifest.json` | Passed | Imported 12 documents. |
+| `python -m contract2agent.cli file-eval validate --corpus .runs/paper-corpus/manifest.json --tasks examples/file_reading_eval/tasks/paper_tasks.jsonl` | Passed | Task file IDs, spans, and quotes validated. |
+
+### Review-Agent Status
+
+- `bug_reviewer` Einstein timed out and was closed before returning a result.
+- `bug_reviewer` Euclid timed out and was closed before returning a result.
+- Newton was interrupted with a narrower final-review request, timed out, and
+  was closed before returning a result.
+- `bug_reviewer` Aristotle was started for a final blocker review, timed out,
+  and was closed before returning a result.
+- These attempts are recorded as attempted independent review, not evaluator
+  evidence and not PASS results.
+
+### Risks And Blockers
+
+- `privacy-eval` is static profile analysis only; it does not prove runtime
+  privacy behavior.
+- AgentLeak, AgentDojo, Opacus, OpenDP, and BLT references are contextual
+  framework inputs, not observed local benchmark results.
+- The paper examples are compact paper cards, not full paper ingestion.
+- Generated `.runs/` and `site/` artifacts should remain ignored.
+
+### Next Step
+
+Add an observed trace importer for `privacy-eval` so future work can compare
+declared privacy controls, static findings, and runtime evidence without
+collapsing those evidence types into a single unsupported score.

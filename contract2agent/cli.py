@@ -53,8 +53,13 @@ from contract2agent.evaluation import (
 )
 from contract2agent.evaluation.file_reading.cli import (
     add_file_eval_argparse,
-    register_typer_commands,
-    run_argparse_command,
+    register_typer_commands as register_file_eval_typer_commands,
+    run_argparse_command as run_file_eval_argparse_command,
+)
+from contract2agent.privacy_eval.cli import (
+    add_privacy_eval_argparse,
+    register_typer_commands as register_privacy_eval_typer_commands,
+    run_argparse_command as run_privacy_eval_argparse_command,
 )
 from contract2agent.schema import load_contract, model_to_dict
 from contract2agent.triage import TriageOptions, run_triage
@@ -1047,7 +1052,8 @@ def _escape_table_text(value: str) -> str:
 
 if _HAS_TYPER:
     app = typer.Typer(help="Offline trace diagnosis for LLM agent behavior.")
-    register_typer_commands(app, typer, console)
+    register_file_eval_typer_commands(app, typer, console)
+    register_privacy_eval_typer_commands(app, typer, console)
 
     @app.command()
     def new(
@@ -1642,6 +1648,7 @@ def _main_argparse() -> int:
     parser = argparse.ArgumentParser(prog="c2a")
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_file_eval_argparse(subparsers)
+    add_privacy_eval_argparse(subparsers)
 
     new_parser = subparsers.add_parser("new")
     new_parser.add_argument("requirement")
@@ -1964,7 +1971,9 @@ def _main_argparse() -> int:
             args.target_context,
         )
     if args.command == "file-eval":
-        return run_argparse_command(args)
+        return run_file_eval_argparse_command(args)
+    if args.command == "privacy-eval":
+        return run_privacy_eval_argparse_command(args)
     parser.error(f"Unknown command: {args.command}")
     return 2
 

@@ -330,10 +330,22 @@ def test_profile_only_mode_does_not_output_observed_score(tmp_path: Path) -> Non
 def test_reference_registry_lists_contextual_sources() -> None:
     sources = curated_reference_sources()
 
-    assert {"qasper", "squad", "hotpotqa", "docvqa", "longbench"}.issubset(
+    assert {"qasper", "squad", "hotpotqa", "docvqa", "longbench", "paperqa2"}.issubset(
         {source.source_id for source in sources}
     )
     assert all(any("Contextual reference only" in item for item in source.limitations) for source in sources)
+
+
+def test_paperqa2_reference_is_contextual_open_source_metadata() -> None:
+    paperqa2 = next(source for source in curated_reference_sources() if source.source_id == "paperqa2")
+
+    assert paperqa2.source_type == "open_source_agent_reference"
+    assert paperqa2.license == "Apache-2.0"
+    assert paperqa2.metrics_available == []
+    assert paperqa2.reliability <= 0.25
+    assert "citation_required_qa" in paperqa2.applicable_task_types
+    assert any("Contextual reference only" in item for item in paperqa2.limitations)
+    assert any("No upstream benchmark claim" in item for item in paperqa2.limitations)
 
 
 def test_benchmark_references_do_not_become_direct_scores() -> None:

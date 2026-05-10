@@ -12,9 +12,11 @@ evidence, not this map alone.
 | `contract2agent/` | Main Python package and CLI-backed application logic. | Legacy contract diagnosis plus newer evaluation subsystems. |
 | `contract2agent/evaluation/` | Generalized agent profile evaluation framework. | Schemas, classification, evidence, scoring, prediction, reports. |
 | `contract2agent/evaluation/file_reading/` | File-reading agent corpus/task/run/grade/report adapter. | Local CLI-driven observed evaluation path. |
+| `contract2agent/privacy_eval/` | Static privacy-risk evaluation for agent workflows. | Data-flow, channel, tool, log, artifact, vector-store, and DP-training readiness checks. |
 | `contract2agent/cost_estimate/` | Static diagnostic cost and time estimation. | Estimate-only, no tests or APIs run. |
 | `contract2agent/patch_preview/` | Preview-only patch proposal analysis and report generation. | Must not be documented as applying patches by default. |
 | `contract2agent/triage/` | Static triage, risk, coverage, and recommendation planning. | Intake and next-step guidance. |
+| `contract2agent/privacy_eval/` | Privacy profile schemas, analyzer, reports, and CLI glue. | Static only; no privacy library, benchmark, or DP accountant execution. |
 | `contract2agent/templates/` | Jinja templates for generated contract/eval projects. | Included as package data. |
 | `docs/` | MkDocs site, static demos, architecture docs, harness records, and static data. | Source of truth for future agents. |
 | `examples/` | Sample profiles, reports, file-reading corpora, dummy agents, and reference outputs. | Examples are fixtures or illustrations unless linked to a documented run. |
@@ -77,6 +79,7 @@ Primary entry points from `pyproject.toml`:
 | Patch analysis | `patch-preview` | Preview-only patch proposals and report/diff artifacts. |
 | General agent evaluation | `eval-agent` | Profile-based agent classification, evidence resolution, scoring, prediction, Markdown/JSON report output. |
 | File-reading evaluation | `file-eval help`, `doctor`, `init`, `import-local`, `list-references`, `import-reference`, `validate`, `build-tasks`, `run`, `profile-only`, `grade`, `compare`, `report`, `configure-llm`, `llm-check`, `judge` | Local corpus/task/run/grade/report flow with optional judge support. |
+| Privacy evaluation | `privacy-eval --profile`, `privacy-eval --list-references` | Static privacy-risk report for sensitive data flows, tool exposure, internal channels, artifacts, vector stores, and DP-training metadata. |
 
 ## Examples Map
 
@@ -84,6 +87,7 @@ Primary entry points from `pyproject.toml`:
 | --- | --- |
 | `examples/agent_eval/` | Agent profiles, benchmark references, and sample experiment results for generalized evaluation examples. |
 | `examples/file_reading_eval/` | File-reading corpus, task packs, dummy readers, target outputs, expected report shapes, references, profiles, and keyless judge config. |
+| `examples/privacy_eval/` | Privacy-sensitive workflow profiles for healthcare multi-agent, federated BLT private learning, and RAG support examples. |
 | `examples/paper-reader-agent/` | Legacy/simple paper-reader example. |
 | `examples/reports/` | Illustrative diagnostic reports, not proof of current runs. |
 | `docs/examples/` | Static playground sample dispute JSON. |
@@ -98,6 +102,7 @@ Primary entry points from `pyproject.toml`:
 | `docs/AGENT_HANDOFF.md`, `docs/harness/PROGRESS.md` | Durable current state and chronological work log. |
 | `docs/harness/` | Harness workflow, gates, eval matrix, registry, sprint template, runbook. |
 | `docs/file-reading-eval/` | File-reading user and example docs. |
+| `docs/privacy-eval/` | Privacy-eval command, GitHub reference comparison, profile shape, examples, and limitations. |
 | `docs/agent-eval/`, `docs/playground/`, `docs/assets/`, `docs/data/` | Static demos and local static metadata. |
 
 ## Tests And Coverage Map
@@ -112,6 +117,7 @@ Primary entry points from `pyproject.toml`:
 | `tests/test_file_reading_eval.py` | Corpus/task/run/grade/report behavior and file-reading safety cases. |
 | `tests/test_file_reading_llm_judge.py` | Optional judge safety, budgets, caching, API key handling, and fallback behavior. |
 | `tests/test_file_reading_docs_examples.py` | File-reading examples and documentation alignment. |
+| `tests/test_privacy_eval.py` | Privacy profile schema, analyzer findings, BLT checks, references, reports, and CLI behavior. |
 | `tests/test_docs_site.py` | README/docs/static demo/MkDocs/GitHub Pages regression checks. |
 | `tests/test_cost_estimate.py`, `tests/test_triage.py`, `tests/test_patch_preview.py` | Developer workflow helpers. |
 | `tests/test_failure_taxonomy.py`, `tests/test_report_rendering.py`, `tests/test_golden_diagnosis.py` | Failure taxonomy, reports, and golden diagnosis stability. |

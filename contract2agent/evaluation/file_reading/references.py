@@ -129,6 +129,45 @@ def curated_reference_sources() -> list[ReferenceSource]:
             notes=["Relevant for long-document and long-corpus robustness planning."],
             limitations=CONTEXTUAL_LIMITATIONS,
         ),
+        ReferenceSource(
+            source_id="paperqa2",
+            title="PaperQA2 open-source file-reading agent reference",
+            source_type="open_source_agent_reference",
+            domain="scientific_document_rag",
+            source_url="https://github.com/Future-House/paper-qa",
+            license="Apache-2.0",
+            provenance=(
+                "Curated metadata from the Future-House/paper-qa GitHub repository, "
+                "README, pyproject metadata, and public repository tree."
+            ),
+            reliability=0.22,
+            applicable_task_types=[
+                "citation_required_qa",
+                "summary_with_citations",
+                "multi_file_qa",
+                "long_document_robustness",
+                "table_or_key_value_lookup",
+                "conflicting_evidence",
+                "source_code_lookup",
+            ],
+            metrics_available=[],
+            notes=[
+                "Useful as an open-source reference for local document indexing, "
+                "evidence retrieval, in-text citations, configurable source limits, "
+                "reader packages, and agent adapter design.",
+                "Treat upstream papers, demos, and published results as methodology "
+                "context until a Contract2Agent run artifact exists.",
+            ],
+            limitations=[
+                *CONTEXTUAL_LIMITATIONS,
+                "No upstream benchmark claim or publication result is imported as "
+                "target-agent performance.",
+                "External metadata, LLM, and embedding calls require explicit local "
+                "configuration outside this dependency-free adapter.",
+                "Page-level or document-level citations need adapter mapping before "
+                "they can satisfy Contract2Agent line-citation graders.",
+            ],
+        ),
     ]
 
 
