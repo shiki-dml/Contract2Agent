@@ -14,25 +14,26 @@ def estimate_review_burden(
     patch_preview_required: bool,
 ) -> HumanReviewEstimate:
     triggers: list[str] = []
+    failure_set = set(failure_types)
     if any(_is_high_risk_tool(tool) for tool in tools):
         triggers.append("high risk tools")
     if any(str(tool.get("side_effect_level") or "") == "external_write" for tool in tools):
         triggers.append("external write tools")
     if any(str(tool.get("category") or "") in {"shell_execution", "code_execution"} for tool in tools):
         triggers.append("shell/code execution")
-    if "SAFETY_RISK" in failure_types:
+    if "SAFETY_RISK" in failure_set:
         triggers.append("safety tests")
-    if "FORBIDDEN_TOOL_CALL" in failure_types:
+    if "FORBIDDEN_TOOL_CALL" in failure_set:
         triggers.append("forbidden tool tests")
-    if "REGRESSION" in failure_types:
+    if "REGRESSION" in failure_set:
         triggers.append("regression checks")
     if patch_preview_required:
         triggers.append("patch preview required")
     if mode == "auto":
         triggers.append("auto mode")
-    if "SCORER_UNCERTAIN" in failure_types:
+    if "SCORER_UNCERTAIN" in failure_set:
         triggers.append("SCORER_UNCERTAIN risk")
-    if "UNKNOWN" in failure_types:
+    if "UNKNOWN" in failure_set:
         triggers.append("UNKNOWN risk")
 
     if mode == "quick" and risk_level == "low" and not triggers:
@@ -44,7 +45,7 @@ def estimate_review_burden(
             explanation="Quick low-risk diagnosis should need little manual review unless a failure appears.",
         )
 
-    if mode == "auto" or risk_level == "high" or {"SAFETY_RISK", "FORBIDDEN_TOOL_CALL"} & set(failure_types):
+    if mode == "auto" or risk_level == "high" or {"SAFETY_RISK", "FORBIDDEN_TOOL_CALL"} & failure_set:
         return HumanReviewEstimate(
             count_range=[2, 12 if mode == "auto" else 8],
             review_burden_level="high",

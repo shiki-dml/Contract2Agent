@@ -9,7 +9,6 @@ from contract2agent.privacy_eval.schema import (
     PrivacyScorecard,
     PrivacyTrainingConfig,
     profile_from_dict,
-    to_dict,
 )
 
 

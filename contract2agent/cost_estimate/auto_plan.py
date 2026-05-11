@@ -36,12 +36,13 @@ def generate_auto_cost_plan(
 ) -> AutoCostPlan:
     auto_readiness = _mapping(triage.get("auto_readiness")) if triage else {}
     patch_readiness = _mapping(triage.get("patch_preview_readiness")) if triage else {}
+    failure_set = set(failure_types)
     blockers = list(str(item) for item in auto_readiness.get("blockers") or [])
     if not patch_readiness.get("eligible"):
         blockers.append("missing patch allowlist")
     if risk_level == "high":
         blockers.append("run deep first for high-risk agents")
-    if {"SAFETY_RISK", "FORBIDDEN_TOOL_CALL"} & set(failure_types):
+    if {"SAFETY_RISK", "FORBIDDEN_TOOL_CALL"} & failure_set:
         blockers.append("safety or forbidden-tool risk requires review before auto")
     if triage is None:
         blockers.append("auto readiness is unknown")
@@ -74,7 +75,7 @@ def generate_auto_cost_plan(
         estimated_patch_attempts=estimated_patch_attempts,
         estimated_validation_runs=validation_runs,
         estimated_regression_checks=regression_checks,
-        overfitting_risk=_overfitting_risk(requested_auto, baseline, eval_metadata, failure_types),
+        overfitting_risk=_overfitting_risk(requested_auto, baseline, eval_metadata, failure_set),
         stop_conditions=STOP_CONDITIONS,
         required_guardrails=[
             "require_patch_preview",
@@ -103,11 +104,12 @@ def generate_patch_preview_cost_context(
     baseline_exists: bool,
 ) -> PatchPreviewCostContext:
     patch_readiness = _mapping(triage.get("patch_preview_readiness")) if triage else {}
+    failure_set = set(failure_types)
     enabled = bool(patch_readiness.get("eligible")) and (guardrails.require_patch_preview or mode == "auto")
     max_patch_attempts = guardrails.max_patch_attempts or (2 if mode == "auto" else 1)
     patch_proposals = [1, max_patch_attempts] if enabled else [0, 0]
-    validation_tests = _validation_tests_for_patch(failure_types)
-    notes: list[str] = [ "Every patch proposal should trigger focused validation tests." ]
+    validation_tests = _validation_tests_for_patch(failure_set)
+    notes: list[str] = ["Every patch proposal should trigger focused validation tests."]
     if not patch_readiness.get("eligible"):
         notes.append("No patch allowlist was detected; patch preview should stay disabled.")
     if baseline_exists:
@@ -121,15 +123,15 @@ def generate_patch_preview_cost_context(
         estimated_validation_tests_per_patch=validation_tests,
         estimated_extra_validation_runs=[patch_proposals[0], max(patch_proposals[1], 1 if enabled else 0)],
         recommended_validation_tags=_validation_tags(failure_types),
-        regression_checks_required=baseline_exists or "REGRESSION" in failure_types,
+        regression_checks_required=baseline_exists or "REGRESSION" in failure_set,
         notes=notes,
     )
 
 
-def _validation_tests_for_patch(failure_types: list[str]) -> list[int]:
-    if {"SAFETY_RISK", "FORBIDDEN_TOOL_CALL", "REGRESSION"} & set(failure_types):
+def _validation_tests_for_patch(failure_types: set[str]) -> list[int]:
+    if {"SAFETY_RISK", "FORBIDDEN_TOOL_CALL", "REGRESSION"} & failure_types:
         return [5, 12]
-    if {"HALLUCINATION_RISK", "LOW_STABILITY"} & set(failure_types):
+    if {"HALLUCINATION_RISK", "LOW_STABILITY"} & failure_types:
         return [4, 10]
     return [2, 6]
 
@@ -151,7 +153,7 @@ def _overfitting_risk(
     requested_auto: bool,
     baseline: BaselineMetadata,
     eval_metadata: EvalMetadata,
-    failure_types: list[str],
+    failure_types: set[str],
 ) -> str:
     if not requested_auto:
         return "low"

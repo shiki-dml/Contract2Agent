@@ -60,10 +60,8 @@ def estimate_test_count_range(
         if mode == "quick":
             high = max(high, min(eval_case_count, 8))
         elif mode == "auto":
-            low = max(low, min(eval_case_count, low))
             high = max(high, eval_case_count * max(1, min(rounds, 3)))
         else:
-            low = max(low, min(eval_case_count, low))
             high = max(high, eval_case_count)
 
     low, high = _apply_profile(low, high, budget_profile)
