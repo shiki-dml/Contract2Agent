@@ -37,7 +37,7 @@ def generate_auto_cost_plan(
     auto_readiness = _mapping(triage.get("auto_readiness")) if triage else {}
     patch_readiness = _mapping(triage.get("patch_preview_readiness")) if triage else {}
     failure_set = set(failure_types)
-    blockers = list(str(item) for item in auto_readiness.get("blockers") or [])
+    blockers = [str(item) for item in auto_readiness.get("blockers") or []]
     if not patch_readiness.get("eligible"):
         blockers.append("missing patch allowlist")
     if risk_level == "high":

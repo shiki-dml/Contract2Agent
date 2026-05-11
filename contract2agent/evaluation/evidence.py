@@ -245,8 +245,6 @@ class EvidenceResolver:
         )
         inference_average = sum(source.reliability for source in direct_sources) / len(direct_sources)
         quality = max(best_experiment, min(0.6, inference_average))
-        if experiments:
-            quality = max(quality, best_experiment)
         return round(quality, 3)
 
     def _coverage_by_type(
